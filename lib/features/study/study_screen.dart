@@ -10,11 +10,12 @@
  * Baseado em AnkiDroid/src/main/java/com/ichi2/anki/Reviewer.kt
  */
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Card;
 import '../../models/card.dart';
 import '../../models/note.dart';
 import '../../services/fsrs_service.dart';
 import '../../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Tela de estudo com cards
 class StudyScreen extends StatefulWidget {
@@ -26,7 +27,7 @@ class StudyScreen extends StatefulWidget {
 
 class _StudyScreenState extends State<StudyScreen> {
   final FsrsService _fsrsService = FsrsService();
-  final SupabaseService? _supabaseService = null; // TODO: Inicializar
+  late final SupabaseService _supabaseService;
 
   Card? _currentCard;
   Note? _currentNote;
@@ -36,22 +37,45 @@ class _StudyScreenState extends State<StudyScreen> {
   @override
   void initState() {
     super.initState();
+    _supabaseService = SupabaseService(Supabase.instance.client);
     _loadNextCard();
   }
 
   Future<void> _loadNextCard() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _showAnswer = false;
     });
 
-    // TODO: Carregar próximo card do Supabase
-    // Por enquanto, placeholder
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    setState(() {
-      _isLoading = false;
-    });
+    try {
+      final dueCards = await _supabaseService.getDueCards();
+      
+      if (dueCards.isNotEmpty && mounted) {
+        setState(() {
+          _currentCard = dueCards.first;
+          // TODO: Carregar note associado ao card
+        });
+      } else if (mounted) {
+        setState(() {
+          _currentCard = null;
+          _currentNote = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao carregar cards: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _answerCard(CardRating rating) async {
@@ -86,14 +110,16 @@ class _StudyScreenState extends State<StudyScreen> {
       }
 
       // 3. Salvar no Supabase
-      // TODO: await _supabaseService?.saveCard(_currentCard!);
+      await _supabaseService.saveCard(_currentCard!);
 
       // 4. Carregar próximo card
       await _loadNextCard();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao processar resposta: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao processar resposta: $e')),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -135,14 +161,15 @@ class _StudyScreenState extends State<StudyScreen> {
           // Card
           Expanded(
             child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Card(
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Container(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Material(
+                    elevation: 8,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    color: Colors.white,
+                    child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(32),
                     child: Column(
@@ -202,7 +229,7 @@ class _StudyScreenState extends State<StudyScreen> {
                 color: Colors.grey[100],
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, -2),
                   ),

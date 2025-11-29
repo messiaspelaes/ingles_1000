@@ -30,15 +30,16 @@ class SupabaseService {
         .from('cards')
         .select()
         .eq('user_id', userId)
-        .lte('due_date', DateTime.now().toIso8601String())
-        .order('due_date', ascending: true)
-        .limit(50);
+        .lte('due_date', DateTime.now().toIso8601String());
 
     if (deckId != null) {
       query = query.eq('deck_id', deckId);
     }
 
-    final response = await query;
+    final response = await query
+        .order('due_date', ascending: true)
+        .limit(50);
+
     return (response as List)
         .map((map) => Card.fromMap(map as Map<String, dynamic>))
         .toList();

@@ -30,17 +30,32 @@ class FsrsService {
     if (_initialized) return;
 
     try {
-      _jsRuntime = getJSRuntime();
-      
-      // Carrega fsrs.js dos assets
-      // Nota: Você precisará adicionar fsrs.js em assets/js/fsrs.js
-      // Baixe de: https://github.com/open-spaced-repetition/fsrs.js
-      final fsrsCode = await rootBundle.loadString('assets/js/fsrs.js');
-      _jsRuntime!.evaluate(fsrsCode);
+      // Tenta criar o runtime JavaScript
+      try {
+        _jsRuntime = getJSRuntime();
+        
+        // Carrega fsrs.js dos assets
+        // Nota: Você precisará adicionar fsrs.js em assets/js/fsrs.js
+        // Baixe de: https://github.com/open-spaced-repetition/fsrs.js
+        try {
+          final fsrsCode = await rootBundle.loadString('assets/js/fsrs.js');
+          _jsRuntime!.evaluate(fsrsCode);
+        } catch (e) {
+          // Se o arquivo não existir, continua sem ele (usa fallback)
+          print('Aviso: fsrs.js não encontrado, usando cálculo fallback');
+        }
+      } catch (e) {
+        // Se o runtime JS não estiver disponível, usa apenas fallback
+        print('Aviso: Runtime JavaScript não disponível, usando cálculo fallback: $e');
+        _jsRuntime = null;
+      }
       
       _initialized = true;
     } catch (e) {
-      throw Exception('Erro ao inicializar FSRS: $e');
+      // Em caso de erro, marca como inicializado mas sem JS runtime
+      _initialized = true;
+      _jsRuntime = null;
+      print('Erro ao inicializar FSRS, usando cálculo fallback: $e');
     }
   }
 
@@ -84,6 +99,11 @@ class FsrsService {
           };
         })();
       ''';
+
+      if (_jsRuntime == null) {
+        // Se não houver runtime JS, usa fallback
+        return _calculateFallback(card, rating, now);
+      }
 
       final result = _jsRuntime!.evaluate(jsCode);
       final resultMap = jsonDecode(result.stringResult) as Map<String, dynamic>;

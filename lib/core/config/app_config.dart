@@ -10,8 +10,8 @@
 /// Configurações do aplicativo
 class AppConfig {
   // Supabase
-  static const String supabaseUrl = 'YOUR_SUPABASE_URL';
-  static const String supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
+  static const String supabaseUrl = 'https://trqasfpvwjqfpoaoxtem.supabase.co';
+  static const String supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRycWFzZnB2d2pxZnBvYW94dGVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ0NDM2OTgsImV4cCI6MjA4MDAxOTY5OH0.WZw-R-M125uG7ZsavJ0b-b8wA6wgzM70FvOkx_9cQQk';
   
   // App
   static const String appName = 'Inglês 1000';
