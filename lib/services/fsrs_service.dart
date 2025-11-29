@@ -10,10 +10,9 @@
  * Utiliza FSRS (Free Spaced Repetition Scheduler) - https://github.com/open-spaced-repetition/fsrs4anki
  */
 
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_js/flutter_js.dart';
+import 'fsrs/fsrs_executor.dart';
 import '../models/card.dart';
 
 /// Serviço para calcular intervalos usando FSRS
@@ -23,7 +22,7 @@ class FsrsService {
   factory FsrsService() => _instance;
   FsrsService._internal();
 
-  JavascriptRuntime? _jsRuntime;
+  FsrsExecutor? _executor;
   bool _initialized = false;
 
   /// Inicializa o runtime JavaScript e carrega fsrs.js
@@ -31,31 +30,21 @@ class FsrsService {
     if (_initialized) return;
 
     try {
-      // Tenta criar o runtime JavaScript
+      // Tenta criar o executor (Native ou Web)
       try {
-        _jsRuntime = getJavascriptRuntime();
-        
-        // Carrega fsrs.js dos assets
-        // Nota: Você precisará adicionar fsrs.js em assets/js/fsrs.js
-        // Baixe de: https://github.com/open-spaced-repetition/fsrs.js
-        try {
-          final fsrsCode = await rootBundle.loadString('assets/js/fsrs.js');
-          _jsRuntime!.evaluate(fsrsCode);
-        } catch (e) {
-          // Se o arquivo não existir, continua sem ele (usa fallback)
-          debugPrint('Aviso: fsrs.js não encontrado, usando cálculo fallback');
-        }
+        _executor = getFsrsExecutor();
+        await _executor!.initialize();
       } catch (e) {
         // Se o runtime JS não estiver disponível, usa apenas fallback
         debugPrint('Aviso: Runtime JavaScript não disponível, usando cálculo fallback: $e');
-        _jsRuntime = null;
+        _executor = null;
       }
       
       _initialized = true;
     } catch (e) {
       // Em caso de erro, marca como inicializado mas sem JS runtime
       _initialized = true;
-      _jsRuntime = null;
+      _executor = null;
       debugPrint('Erro ao inicializar FSRS, usando cálculo fallback: $e');
     }
   }
@@ -82,32 +71,16 @@ class FsrsService {
         'rating': rating.value,
       };
 
-      // Chama a função FSRS via JavaScript
-      final jsCode = '''
-        (function() {
-          const params = ${jsonEncode(params)};
-          // Aqui você chamaria a função FSRS real
-          // Por enquanto, retornamos um cálculo simplificado
-          const newStability = params.stability * 1.5;
-          const newDifficulty = params.difficulty;
-          const newInterval = Math.max(1, Math.floor(newStability));
-          
-          return {
-            difficulty: newDifficulty,
-            stability: newStability,
-            interval: newInterval,
-            dueDate: params.now + (newInterval * 24 * 60 * 60 * 1000)
-          };
-        })();
-      ''';
-
-      if (_jsRuntime == null) {
+      if (_executor == null) {
         // Se não houver runtime JS, usa fallback
         return _calculateFallback(card, rating, now);
       }
 
-      final result = _jsRuntime!.evaluate(jsCode);
-      final resultMap = jsonDecode(result.stringResult) as Map<String, dynamic>;
+      final resultMap = await _executor!.evaluate(params);
+
+      if (resultMap == null) {
+        return _calculateFallback(card, rating, now);
+      }
 
       return FsrsResult(
         difficulty: (resultMap['difficulty'] as num).toDouble(),
@@ -116,6 +89,7 @@ class FsrsService {
         dueDate: DateTime.fromMillisecondsSinceEpoch(resultMap['dueDate'] as int),
       );
     } catch (e) {
+      debugPrint('Erro no cálculo FSRS: $e');
       // Fallback para cálculo simples se FSRS falhar
       return _calculateFallback(card, rating, now);
     }
@@ -160,7 +134,7 @@ class FsrsService {
 
   /// Limpa recursos
   void dispose() {
-    _jsRuntime?.dispose();
+    _executor?.dispose();
     _initialized = false;
   }
 }
@@ -179,4 +153,3 @@ class FsrsResult {
     required this.dueDate,
   });
 }
-

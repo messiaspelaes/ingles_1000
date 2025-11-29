@@ -27,7 +27,7 @@ dependencies:
   
   # Utilitários
   audioplayers: ^5.1.0
-  file_picker: ^6.0.0  # Para selecionar .apkg
+  file_picker: ^8.0.0  # Para selecionar .apkg
   url_launcher: ^6.2.0 # Para abrir URLs na tela About
 
 dev_dependencies:
