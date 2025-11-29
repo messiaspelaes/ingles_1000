@@ -11,6 +11,7 @@
  */
 
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_js/flutter_js.dart';
 import '../models/card.dart';
@@ -22,7 +23,7 @@ class FsrsService {
   factory FsrsService() => _instance;
   FsrsService._internal();
 
-  JsRuntime? _jsRuntime;
+  JavascriptRuntime? _jsRuntime;
   bool _initialized = false;
 
   /// Inicializa o runtime JavaScript e carrega fsrs.js
@@ -32,7 +33,7 @@ class FsrsService {
     try {
       // Tenta criar o runtime JavaScript
       try {
-        _jsRuntime = getJSRuntime();
+        _jsRuntime = getJavascriptRuntime();
         
         // Carrega fsrs.js dos assets
         // Nota: Você precisará adicionar fsrs.js em assets/js/fsrs.js
@@ -42,11 +43,11 @@ class FsrsService {
           _jsRuntime!.evaluate(fsrsCode);
         } catch (e) {
           // Se o arquivo não existir, continua sem ele (usa fallback)
-          print('Aviso: fsrs.js não encontrado, usando cálculo fallback');
+          debugPrint('Aviso: fsrs.js não encontrado, usando cálculo fallback');
         }
       } catch (e) {
         // Se o runtime JS não estiver disponível, usa apenas fallback
-        print('Aviso: Runtime JavaScript não disponível, usando cálculo fallback: $e');
+        debugPrint('Aviso: Runtime JavaScript não disponível, usando cálculo fallback: $e');
         _jsRuntime = null;
       }
       
@@ -55,7 +56,7 @@ class FsrsService {
       // Em caso de erro, marca como inicializado mas sem JS runtime
       _initialized = true;
       _jsRuntime = null;
-      print('Erro ao inicializar FSRS, usando cálculo fallback: $e');
+      debugPrint('Erro ao inicializar FSRS, usando cálculo fallback: $e');
     }
   }
 
