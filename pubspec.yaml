@@ -40,10 +40,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/images/
-    - assets/audio/
-    - assets/svg/
-    - assets/fonts/
     - assets/icon.png
 
 flutter_launcher_icons:
