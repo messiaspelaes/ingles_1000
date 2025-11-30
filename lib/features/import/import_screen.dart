@@ -9,12 +9,14 @@
  * Adaptado de AnkiDroid (GPL v3) - https://github.com/ankidroid/Anki-Android
  */
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Card;
 import 'package:file_picker/file_picker.dart';
 import '../../services/apkg_service.dart';
-import '../../services/supabase_service.dart';
+import '../../services/database_service.dart';
 import '../../models/card.dart';
 import '../../models/note.dart';
+import '../../models/deck.dart';
+import '../../utils/date_utils.dart' as app_date_utils;
 
 /// Tela para importar arquivos .apkg
 class ImportScreen extends StatefulWidget {
@@ -26,6 +28,7 @@ class ImportScreen extends StatefulWidget {
 
 class _ImportScreenState extends State<ImportScreen> {
   final ApkgService _apkgService = ApkgService();
+  final DatabaseService _databaseService = DatabaseService();
   bool _isImporting = false;
   String? _errorMessage;
   String? _successMessage;
@@ -56,13 +59,89 @@ class _ImportScreenState extends State<ImportScreen> {
       // 2. Importar .apkg
       final importResult = await _apkgService.importApkg(apkgPath);
 
-      // 3. Salvar no Supabase
-      // TODO: Implementar salvamento no Supabase
-      // Por enquanto, apenas mostra sucesso
+      // 3. Criar deck padrão ou usar existente
+      final deckName = 'Deck Importado ${DateTime.now().toString().substring(0, 10)}';
+      final deckId = await _databaseService.createDeck(deckName);
+
+      // 4. Converter e salvar notas
+      final noteMap = <int, String>{}; // Mapeia anki note ID -> novo note ID
+      int noteCounter = 0;
+      for (final ankiNote in importResult.notes) {
+        final noteId = '${DateTime.now().millisecondsSinceEpoch}_${noteCounter++}';
+        noteMap[ankiNote.id] = noteId;
+        
+        final note = Note(
+          id: noteId,
+          deckId: deckId,
+          userId: '', // Não usado offline
+          fields: ankiNote.fields,
+          tags: ankiNote.tags,
+          modelName: 'Basic',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          ankiGuid: ankiNote.guid,
+          ankiNoteId: ankiNote.id,
+        );
+        
+        await _databaseService.saveNote(note);
+      }
+
+      // 5. Converter e salvar cards
+      int cardsSaved = 0;
+      int cardCounter = 0;
+      for (final ankiCard in importResult.cards) {
+        // Pular cards órfãos (sem note correspondente)
+        if (!noteMap.containsKey(ankiCard.noteId)) continue;
+
+        final cardId = '${DateTime.now().millisecondsSinceEpoch}_${cardCounter++}';
+        final noteId = noteMap[ankiCard.noteId]!;
+        
+        // Converter queue do Anki para CardQueueType
+        // Anki queue: 0=NEW, 1=LEARNING, 2=REVIEW, 3=DAY_LEARNING, -1=SUSPENDED, -2=SIBLING_BURIED, -3=MANUAL_BURIED
+        CardQueueType queueType;
+        if (ankiCard.queue == 0) {
+          queueType = CardQueueType.newCard;
+        } else if (ankiCard.queue == 1 || ankiCard.queue == 3) {
+          queueType = CardQueueType.learning;
+        } else if (ankiCard.queue == 2) {
+          queueType = CardQueueType.review;
+        } else if (ankiCard.queue < 0) {
+          // Cards suspensos ou enterrados - tratamos como new
+          queueType = CardQueueType.newCard;
+        } else {
+          queueType = CardQueueType.relearning;
+        }
+
+        // Converter due date
+        final dueDate = app_date_utils.DateUtils.ankiTimestampToDateTime(ankiCard.due);
+        
+        final card = Card(
+          id: cardId,
+          noteId: noteId,
+          deckId: deckId,
+          userId: '', // Não usado offline
+          queueType: queueType,
+          fsrsDifficulty: 0.3,
+          fsrsStability: ankiCard.interval > 0 ? ankiCard.interval.toDouble() : 0.0,
+          fsrsRetrievability: 1.0,
+          dueDate: dueDate,
+          intervalDays: ankiCard.interval,
+          easeFactor: ankiCard.easeFactor,
+          reviewsCount: ankiCard.reviewsCount,
+          lapsesCount: ankiCard.lapsesCount,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          ankiCardId: ankiCard.id,
+          ankiDue: ankiCard.due,
+        );
+        
+        await _databaseService.saveCard(card);
+        cardsSaved++;
+      }
       
       setState(() {
         _successMessage =
-            'Importado com sucesso!\n${importResult.notes.length} notas\n${importResult.cards.length} cards';
+            'Importado com sucesso!\n${importResult.notes.length} notas\n$cardsSaved cards\nDeck: $deckName';
         _isImporting = false;
       });
     } catch (e) {

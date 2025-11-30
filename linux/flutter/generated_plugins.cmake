@@ -5,7 +5,6 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_linux
   flutter_js
-  gtk
   url_launcher_linux
 )
 

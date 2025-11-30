@@ -14,8 +14,7 @@ import 'package:flutter/material.dart' hide Card;
 import '../../models/card.dart';
 import '../../models/note.dart';
 import '../../services/fsrs_service.dart';
-import '../../services/supabase_service.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/database_service.dart';
 
 /// Tela de estudo com cards
 class StudyScreen extends StatefulWidget {
@@ -27,7 +26,7 @@ class StudyScreen extends StatefulWidget {
 
 class _StudyScreenState extends State<StudyScreen> {
   final FsrsService _fsrsService = FsrsService();
-  late final SupabaseService _supabaseService;
+  final DatabaseService _databaseService = DatabaseService();
 
   Card? _currentCard;
   Note? _currentNote;
@@ -37,7 +36,6 @@ class _StudyScreenState extends State<StudyScreen> {
   @override
   void initState() {
     super.initState();
-    _supabaseService = SupabaseService(Supabase.instance.client);
     _loadNextCard();
   }
 
@@ -50,12 +48,15 @@ class _StudyScreenState extends State<StudyScreen> {
     });
 
     try {
-      final dueCards = await _supabaseService.getDueCards();
+      final dueCards = await _databaseService.getDueCards();
       
       if (dueCards.isNotEmpty && mounted) {
+        final card = dueCards.first;
+        final note = await _databaseService.getNoteById(card.noteId);
+        
         setState(() {
-          _currentCard = dueCards.first;
-          // TODO: Carregar note associado ao card
+          _currentCard = card;
+          _currentNote = note;
         });
       } else if (mounted) {
         setState(() {
@@ -109,8 +110,8 @@ class _StudyScreenState extends State<StudyScreen> {
         _currentCard!.queueType = CardQueueType.review;
       }
 
-      // 3. Salvar no Supabase
-      await _supabaseService.saveCard(_currentCard!);
+      // 3. Salvar no banco local
+      await _databaseService.saveCard(_currentCard!);
 
       // 4. Carregar próximo card
       await _loadNextCard();

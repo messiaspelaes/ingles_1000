@@ -8,8 +8,7 @@
  */
 
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../services/supabase_service.dart';
+import '../../services/database_service.dart';
 
 /// Tela de progresso e estatísticas
 class ProgressScreen extends StatefulWidget {
@@ -20,7 +19,7 @@ class ProgressScreen extends StatefulWidget {
 }
 
 class _ProgressScreenState extends State<ProgressScreen> {
-  final SupabaseService _supabaseService = SupabaseService(Supabase.instance.client);
+  final DatabaseService _databaseService = DatabaseService();
   bool _isLoading = true;
   int _totalCards = 0;
   int _dueCards = 0;
@@ -38,15 +37,16 @@ class _ProgressScreenState extends State<ProgressScreen> {
     });
 
     try {
-      // TODO: Implementar busca de estatísticas do Supabase
-      // Por enquanto, valores placeholder
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Buscar estatísticas do banco local
+      final dueCards = await _databaseService.getDueCards();
+      final totalCards = await _databaseService.getTotalCardsCount();
+      final reviewedToday = await _databaseService.getReviewedTodayCount();
       
       if (mounted) {
         setState(() {
-          _totalCards = 0;
-          _dueCards = 0;
-          _reviewedToday = 0;
+          _totalCards = totalCards;
+          _dueCards = dueCards.length;
+          _reviewedToday = reviewedToday;
           _isLoading = false;
         });
       }

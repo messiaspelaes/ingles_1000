@@ -14,9 +14,6 @@ dependencies:
   flutter_svg: ^2.0.7
   fl_chart: ^0.55.2
   
-  # Backend
-  supabase_flutter: ^2.0.0
-  
   # FSRS
   flutter_js: ^0.7.0  # Para executar fsrs.js
   
@@ -24,6 +21,7 @@ dependencies:
   archive: ^3.4.0      # Descompactar ZIP
   sqflite: ^2.3.0      # Ler SQLite do .apkg
   path_provider: ^2.1.1
+  path: ^1.9.0         # Manipulação de caminhos
   
   # Utilitários
   audioplayers: ^5.1.0
