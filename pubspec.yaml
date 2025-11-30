@@ -15,7 +15,7 @@ dependencies:
   fl_chart: ^0.55.2
   
   # FSRS
-  flutter_js: ^0.7.0  # Para executar fsrs.js
+  flutter_js: ^0.8.0  # Para executar fsrs.js
   
   # Importação .apkg
   archive: ^3.4.0      # Descompactar ZIP

@@ -218,10 +218,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_js
-      sha256: c4e0ff2cac3378e34eb0cafb58089377a7722d3531cdf9fcd5a53b5afc66c2dc
+      sha256: a04966b102967891ee4947d6e52b450676f16204876ba936e394008ca26db04b
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.2"
+    version: "0.8.5"
   flutter_launcher_icons:
     dependency: "direct dev"
     description:
@@ -268,10 +268,10 @@ packages:
     dependency: transitive
     description:
       name: http
-      sha256: "5895291c13fa8a3bd82e76d5627f69e0d85ca6a30dcac95c4ea19a5d555879c2"
+      sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
       url: "https://pub.dev"
     source: hosted
-    version: "0.13.6"
+    version: "1.6.0"
   http_parser:
     dependency: transitive
     description:
