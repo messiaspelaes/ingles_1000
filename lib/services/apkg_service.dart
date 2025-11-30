@@ -13,6 +13,7 @@
 
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -22,7 +23,7 @@ import '../models/note.dart';
 /// Serviço para importar arquivos .apkg do Anki
 /// Adaptado do código do AnkiDroid
 class ApkgService {
-  /// Importa um arquivo .apkg e retorna os dados extraídos
+  /// Importa um arquivo .apkg e retorna os dados extraídos (usando path - mobile)
   /// 
   /// Um arquivo .apkg é um ZIP contendo:
   /// - collection.anki2: banco SQLite com cards, notas, scheduling
@@ -33,7 +34,22 @@ class ApkgService {
       // 1. Ler arquivo ZIP
       final file = File(apkgPath);
       final bytes = await file.readAsBytes();
-      final archive = ZipDecoder().decodeBytes(bytes);
+      return await importApkgFromBytes(bytes);
+    } catch (e) {
+      throw Exception('Erro ao importar .apkg: $e');
+    }
+  }
+
+  /// Importa um arquivo .apkg e retorna os dados extraídos (usando bytes - web/mobile)
+  /// 
+  /// Um arquivo .apkg é um ZIP contendo:
+  /// - collection.anki2: banco SQLite com cards, notas, scheduling
+  /// - media/: imagens, áudios e outros arquivos
+  /// - media.json: mapeamento de arquivos de mídia
+  Future<ApkgImportResult> importApkgFromBytes(Uint8List apkgBytes) async {
+    try {
+      // 1. Decodificar arquivo ZIP
+      final archive = ZipDecoder().decodeBytes(apkgBytes);
 
       // 2. Extrair collection.anki2 (banco SQLite)
       final dbEntry = archive.findFile('collection.anki2');
@@ -42,11 +58,21 @@ class ApkgService {
       }
 
       // 3. Salvar temporariamente e abrir SQLite
-      final tempDir = await getTemporaryDirectory();
-      final tempDbPath = '${tempDir.path}/anki_temp.db';
-      await File(tempDbPath).writeAsBytes(dbEntry.content);
-
-      final db = await openDatabase(tempDbPath, readOnly: true);
+      Database db;
+      String? tempDbPath;
+      
+      if (kIsWeb) {
+        // Na web, sqflite não funciona. Vamos usar uma abordagem alternativa
+        // Por enquanto, vamos informar que precisa usar mobile
+        // TODO: Implementar suporte completo para web usando sql.js
+        throw Exception('Importação .apkg na web ainda não está totalmente suportada devido a limitações do SQLite na web. Por favor, use a versão mobile do aplicativo para importar arquivos .apkg.');
+      } else {
+        // No mobile, usar sqflite normalmente
+        final tempDir = await getTemporaryDirectory();
+        tempDbPath = '${tempDir.path}/anki_temp.db';
+        await File(tempDbPath).writeAsBytes(dbEntry.content);
+        db = await openDatabase(tempDbPath, readOnly: true);
+      }
 
       // 4. Ler dados do banco
       final notes = await _readNotes(db);
@@ -55,7 +81,9 @@ class ApkgService {
 
       // 5. Limpar arquivo temporário
       await db.close();
-      await File(tempDbPath).delete();
+      if (tempDbPath != null && !kIsWeb) {
+        await File(tempDbPath).delete();
+      }
 
       return ApkgImportResult(
         notes: notes,

@@ -10,7 +10,9 @@
  */
 
 import 'package:flutter/material.dart' hide Card;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
+import 'dart:typed_data';
 import '../../services/apkg_service.dart';
 import '../../services/database_service.dart';
 import '../../models/card.dart';
@@ -47,17 +49,31 @@ class _ImportScreenState extends State<ImportScreen> {
         allowedExtensions: ['apkg'],
       );
 
-      if (result == null || result.files.single.path == null) {
+      if (result == null || result.files.isEmpty) {
         setState(() {
           _isImporting = false;
         });
         return;
       }
 
-      final apkgPath = result.files.single.path!;
+      final file = result.files.single;
 
       // 2. Importar .apkg
-      final importResult = await _apkgService.importApkg(apkgPath);
+      // Na web, usar bytes; no mobile, usar path
+      ApkgImportResult importResult;
+      if (kIsWeb) {
+        // Na web, path não está disponível, usar bytes
+        if (file.bytes == null) {
+          throw Exception('Não foi possível ler o arquivo. Tente novamente.');
+        }
+        importResult = await _apkgService.importApkgFromBytes(file.bytes!);
+      } else {
+        // No mobile, usar path
+        if (file.path == null) {
+          throw Exception('Caminho do arquivo não disponível.');
+        }
+        importResult = await _apkgService.importApkg(file.path!);
+      }
 
       // 3. Criar deck padrão ou usar existente
       final deckName = 'Deck Importado ${DateTime.now().toString().substring(0, 10)}';
