@@ -226,7 +226,7 @@ class _StudyScreenState extends State<StudyScreen> {
                     Icon(Icons.fiber_new, color: Colors.blue[700], size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      'Novos: \u0024_novosRestantes / \u0024_limitNovos',
+                      'Novos: $_novosRestantes / $_limitNovos',
                       style: TextStyle(
                         color: Colors.blue[800],
                         fontWeight: _currentCard?.queueType == CardQueueType.newCard ? FontWeight.bold : FontWeight.normal,
@@ -241,7 +241,7 @@ class _StudyScreenState extends State<StudyScreen> {
                     Icon(Icons.history, color: Colors.orange[700], size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      'Revisão: \u0024_revisoesRestantes / \u0024_limitRevisoes',
+                      'Revisão: $_revisoesRestantes / $_limitRevisoes',
                       style: TextStyle(
                         color: Colors.orange[800],
                         fontWeight: _currentCard?.queueType != CardQueueType.newCard ? FontWeight.bold : FontWeight.normal,

@@ -20,19 +20,19 @@ void main() async {
     final db = sqlite3.open('collection.anki2');
     
     final tables = db.select("SELECT name FROM sqlite_master WHERE type='table'");
-    print('Tables: \${tables.map((row) => row["name"]).toList()}');
+    print('Tables: ${tables.map((row) => row["name"]).toList()}');
     
     if (tables.any((row) => row["name"] == 'notes')) {
       final notes = db.select('SELECT count(*) FROM notes');
-      print('Notes count: \${notes.first.values.first}');
+      print('Notes count: ${notes.first.values.first}');
     }
     
     if (tables.any((row) => row["name"] == 'cards')) {
       final cards = db.select('SELECT count(*) FROM cards');
-      print('Cards count: \${cards.first.values.first}');
+      print('Cards count: ${cards.first.values.first}');
     }
     db.dispose();
   } catch (e) {
-    print('Error: \$e');
+    print('Error: $e');
   }
 }

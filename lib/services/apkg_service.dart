@@ -17,14 +17,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
-import '../models/card.dart';
-import '../models/note.dart';
 
 /// Serviço para importar arquivos .apkg do Anki
 /// Adaptado do código do AnkiDroid
 class ApkgService {
   /// Importa um arquivo .apkg e retorna os dados extraídos (usando path - mobile)
-  /// 
+  ///
   /// Um arquivo .apkg é um ZIP contendo:
   /// - collection.anki2: banco SQLite com cards, notas, scheduling
   /// - media/: imagens, áudios e outros arquivos
@@ -41,7 +39,7 @@ class ApkgService {
   }
 
   /// Importa um arquivo .apkg e retorna os dados extraídos (usando bytes - web/mobile)
-  /// 
+  ///
   /// Um arquivo .apkg é um ZIP contendo:
   /// - collection.anki2: banco SQLite com cards, notas, scheduling
   /// - media/: imagens, áudios e outros arquivos
@@ -60,12 +58,14 @@ class ApkgService {
       // 3. Salvar temporariamente e abrir SQLite
       Database db;
       String? tempDbPath;
-      
+
       if (kIsWeb) {
         // Na web, sqflite não funciona. Vamos usar uma abordagem alternativa
         // Por enquanto, vamos informar que precisa usar mobile
         // TODO: Implementar suporte completo para web usando sql.js
-        throw Exception('Importação .apkg na web ainda não está totalmente suportada devido a limitações do SQLite na web. Por favor, use a versão mobile do aplicativo para importar arquivos .apkg.');
+        throw Exception(
+          'Importação .apkg na web ainda não está totalmente suportada devido a limitações do SQLite na web. Por favor, use a versão mobile do aplicativo para importar arquivos .apkg.',
+        );
       } else {
         // No mobile, usar sqflite normalmente
         final tempDir = await getTemporaryDirectory();
@@ -81,7 +81,7 @@ class ApkgService {
 
       // 5. Limpar arquivo temporário
       await db.close();
-      if (tempDbPath != null && !kIsWeb) {
+      if (!kIsWeb) {
         await File(tempDbPath).delete();
       }
 
@@ -115,13 +115,15 @@ class ApkgService {
       final tagsStr = row['tags'] as String? ?? '';
       final tags = tagsStr.split(' ').where((t) => t.isNotEmpty).toList();
 
-      notesList.add(AnkiNote(
-        id: row['id'] as int,
-        guid: row['guid'] as String,
-        modelId: row['mid'] as int,
-        fields: fields,
-        tags: tags,
-      ));
+      notesList.add(
+        AnkiNote(
+          id: row['id'] as int,
+          guid: row['guid'] as String,
+          modelId: row['mid'] as int,
+          fields: fields,
+          tags: tags,
+        ),
+      );
     }
 
     return notesList;
@@ -140,18 +142,20 @@ class ApkgService {
     ''');
 
     for (final row in cards) {
-      cardsList.add(AnkiCard(
-        id: row['id'] as int,
-        noteId: row['nid'] as int,
-        deckId: row['did'] as int,
-        type: row['type'] as int,
-        queue: row['queue'] as int,
-        due: row['due'] as int,
-        interval: row['ivl'] as int? ?? 0,
-        easeFactor: (row['factor'] as int? ?? 2500) / 1000.0,
-        reviewsCount: row['reps'] as int? ?? 0,
-        lapsesCount: row['lapses'] as int? ?? 0,
-      ));
+      cardsList.add(
+        AnkiCard(
+          id: row['id'] as int,
+          noteId: row['nid'] as int,
+          deckId: row['did'] as int,
+          type: row['type'] as int,
+          queue: row['queue'] as int,
+          due: row['due'] as int,
+          interval: row['ivl'] as int? ?? 0,
+          easeFactor: (row['factor'] as int? ?? 2500) / 1000.0,
+          reviewsCount: row['reps'] as int? ?? 0,
+          lapsesCount: row['lapses'] as int? ?? 0,
+        ),
+      );
     }
 
     return cardsList;
@@ -216,9 +220,9 @@ class AnkiCard {
   final int id;
   final int noteId;
   final int deckId;
-  final int type;      // CardType
-  final int queue;     // QueueType
-  final int due;       // Due date (dias desde epoch ou timestamp)
+  final int type; // CardType
+  final int queue; // QueueType
+  final int due; // Due date (dias desde epoch ou timestamp)
   final int interval;
   final double easeFactor;
   final int reviewsCount;
@@ -237,4 +241,3 @@ class AnkiCard {
     required this.lapsesCount,
   });
 }
-
