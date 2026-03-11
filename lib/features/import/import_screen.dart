@@ -12,12 +12,12 @@
 import 'package:flutter/material.dart' hide Card;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
-import 'dart:typed_data';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 import '../../services/apkg_service.dart';
 import '../../services/database_service.dart';
 import '../../models/card.dart';
 import '../../models/note.dart';
-import '../../models/deck.dart';
 import '../../utils/date_utils.dart' as app_date_utils;
 
 /// Tela para importar arquivos .apkg
@@ -76,16 +76,18 @@ class _ImportScreenState extends State<ImportScreen> {
       }
 
       // 3. Criar deck padrão ou usar existente
-      final deckName = 'Deck Importado ${DateTime.now().toString().substring(0, 10)}';
+      final deckName =
+          'Deck Importado ${DateTime.now().toString().substring(0, 10)}';
       final deckId = await _databaseService.createDeck(deckName);
 
       // 4. Converter e salvar notas
       final noteMap = <int, String>{}; // Mapeia anki note ID -> novo note ID
       int noteCounter = 0;
       for (final ankiNote in importResult.notes) {
-        final noteId = '${DateTime.now().millisecondsSinceEpoch}_${noteCounter++}';
+        final noteId =
+            '${DateTime.now().millisecondsSinceEpoch}_${noteCounter++}';
         noteMap[ankiNote.id] = noteId;
-        
+
         final note = Note(
           id: noteId,
           deckId: deckId,
@@ -98,7 +100,7 @@ class _ImportScreenState extends State<ImportScreen> {
           ankiGuid: ankiNote.guid,
           ankiNoteId: ankiNote.id,
         );
-        
+
         await _databaseService.saveNote(note);
       }
 
@@ -109,9 +111,10 @@ class _ImportScreenState extends State<ImportScreen> {
         // Pular cards órfãos (sem note correspondente)
         if (!noteMap.containsKey(ankiCard.noteId)) continue;
 
-        final cardId = '${DateTime.now().millisecondsSinceEpoch}_${cardCounter++}';
+        final cardId =
+            '${DateTime.now().millisecondsSinceEpoch}_${cardCounter++}';
         final noteId = noteMap[ankiCard.noteId]!;
-        
+
         // Converter queue do Anki para CardQueueType
         // Anki queue: 0=NEW, 1=LEARNING, 2=REVIEW, 3=DAY_LEARNING, -1=SUSPENDED, -2=SIBLING_BURIED, -3=MANUAL_BURIED
         CardQueueType queueType;
@@ -129,8 +132,10 @@ class _ImportScreenState extends State<ImportScreen> {
         }
 
         // Converter due date
-        final dueDate = app_date_utils.DateUtils.ankiTimestampToDateTime(ankiCard.due);
-        
+        final dueDate = app_date_utils.DateUtils.ankiTimestampToDateTime(
+          ankiCard.due,
+        );
+
         final card = Card(
           id: cardId,
           noteId: noteId,
@@ -138,7 +143,8 @@ class _ImportScreenState extends State<ImportScreen> {
           userId: '', // Não usado offline
           queueType: queueType,
           fsrsDifficulty: 0.3,
-          fsrsStability: ankiCard.interval > 0 ? ankiCard.interval.toDouble() : 0.0,
+          fsrsStability:
+              ankiCard.interval > 0 ? ankiCard.interval.toDouble() : 0.0,
           fsrsRetrievability: 1.0,
           dueDate: dueDate,
           intervalDays: ankiCard.interval,
@@ -150,14 +156,33 @@ class _ImportScreenState extends State<ImportScreen> {
           ankiCardId: ankiCard.id,
           ankiDue: ankiCard.due,
         );
-        
+
         await _databaseService.saveCard(card);
         cardsSaved++;
       }
-      
+
+      // 6. Salvar arquivos de mídia
+      if (importResult.mediaFiles.isNotEmpty) {
+        final dir = await getApplicationDocumentsDirectory();
+        final mediaDir = Directory('${dir.path}/media/$deckId');
+
+        // Criar diretório se não existir
+        if (!await mediaDir.exists()) {
+          await mediaDir.create(recursive: true);
+        }
+
+        for (final entry in importResult.mediaFiles.entries) {
+          final fileName = entry.key;
+          final fileBytes = entry.value;
+
+          final mediaFile = File('${mediaDir.path}/$fileName');
+          await mediaFile.writeAsBytes(fileBytes);
+        }
+      }
+
       setState(() {
         _successMessage =
-            'Importado com sucesso!\n${importResult.notes.length} notas\n$cardsSaved cards\nDeck: $deckName';
+            'Importado com sucesso!\n${importResult.notes.length} notas\n$cardsSaved cards\n${importResult.mediaFiles.length} arquivos de mídia\nDeck: $deckName';
         _isImporting = false;
       });
     } catch (e) {
@@ -171,35 +196,23 @@ class _ImportScreenState extends State<ImportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Importar Deck'),
-      ),
+      appBar: AppBar(title: const Text('Importar Deck')),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.upload_file,
-              size: 80,
-              color: Colors.blue[400],
-            ),
+            Icon(Icons.upload_file, size: 80, color: Colors.blue[400]),
             const SizedBox(height: 24),
             const Text(
               'Importar arquivo .apkg',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             const Text(
               'Selecione um arquivo .apkg do Anki para importar seus flashcards',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
@@ -249,14 +262,17 @@ class _ImportScreenState extends State<ImportScreen> {
               ),
             ElevatedButton.icon(
               onPressed: _isImporting ? null : _importApkg,
-              icon: _isImporting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.folder_open),
-              label: Text(_isImporting ? 'Importando...' : 'Selecionar arquivo .apkg'),
+              icon:
+                  _isImporting
+                      ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                      : const Icon(Icons.folder_open),
+              label: Text(
+                _isImporting ? 'Importando...' : 'Selecionar arquivo .apkg',
+              ),
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
@@ -271,4 +287,3 @@ class _ImportScreenState extends State<ImportScreen> {
     );
   }
 }
-

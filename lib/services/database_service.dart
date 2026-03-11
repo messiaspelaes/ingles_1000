@@ -12,7 +12,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
-import 'dart:io';
 import '../models/deck.dart';
 import '../models/note.dart';
 import '../models/card.dart';
@@ -24,9 +23,9 @@ import 'dart:convert';
 class DatabaseService {
   static const String _databaseName = 'ingles1000.db';
   static const int _databaseVersion = 1;
-  
+
   static Database? _database;
-  
+
   /// Obtém a instância do banco de dados
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -38,7 +37,7 @@ class DatabaseService {
   Future<Database> _initDatabase() async {
     final documentsDirectory = await getApplicationDocumentsDirectory();
     final dbPath = path.join(documentsDirectory.path, _databaseName);
-    
+
     return await openDatabase(
       dbPath,
       version: _databaseVersion,
@@ -137,9 +136,13 @@ class DatabaseService {
     // Índices para performance
     await db.execute('CREATE INDEX idx_cards_deck ON cards(deck_id)');
     await db.execute('CREATE INDEX idx_cards_due_date ON cards(due_date)');
-    await db.execute('CREATE INDEX idx_cards_queue_type ON cards(queue_type, due_date)');
+    await db.execute(
+      'CREATE INDEX idx_cards_queue_type ON cards(queue_type, due_date)',
+    );
     await db.execute('CREATE INDEX idx_notes_deck ON notes(deck_id)');
-    await db.execute('CREATE INDEX idx_review_logs_card ON review_logs(card_id)');
+    await db.execute(
+      'CREATE INDEX idx_review_logs_card ON review_logs(card_id)',
+    );
   }
 
   /// Atualiza o banco em versões futuras
@@ -150,6 +153,13 @@ class DatabaseService {
   // ============================================================================
   // DECKS
   // ============================================================================
+
+  /// Obtém a contagem de decks
+  Future<int> countDecks() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) FROM decks');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
 
   /// Obtém todos os decks
   Future<List<Deck>> getAllDecks() async {
@@ -193,10 +203,7 @@ class DatabaseService {
     final db = await database;
     await db.update(
       'decks',
-      {
-        ...deck.toMap(),
-        'updated_at': DateTime.now().toIso8601String(),
-      },
+      {...deck.toMap(), 'updated_at': DateTime.now().toIso8601String()},
       where: 'id = ?',
       whereArgs: [deck.id],
     );
@@ -259,10 +266,10 @@ class DatabaseService {
   /// Obtém cards novos que ainda não foram estudados
   Future<List<Card>> getNewCards({String? deckId, int limit = 10}) async {
     final db = await database;
-    
+
     String whereClause = 'queue_type = ?';
     List<dynamic> whereArgs = ['NEW'];
-    
+
     if (deckId != null) {
       whereClause += ' AND deck_id = ?';
       whereArgs.add(deckId);
@@ -283,11 +290,11 @@ class DatabaseService {
   Future<List<Card>> getReviewCards({String? deckId, int limit = 10}) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
-    
+
     // Pega cards vencidos que estão nas filas de REVISÃO, APRENDIZADO ou RE-APRENDIZADO
     String whereClause = 'due_date <= ? AND queue_type != ?';
     List<dynamic> whereArgs = [now, 'NEW'];
-    
+
     if (deckId != null) {
       whereClause += ' AND deck_id = ?';
       whereArgs.add(deckId);
@@ -377,9 +384,10 @@ class DatabaseService {
       deckId: map['deck_id'] as String,
       userId: '', // Não usado offline
       fields: List<String>.from(jsonDecode(map['fields'] as String)),
-      tags: map['tags'] != null
-          ? List<String>.from(jsonDecode(map['tags'] as String))
-          : [],
+      tags:
+          map['tags'] != null
+              ? List<String>.from(jsonDecode(map['tags'] as String))
+              : [],
       modelName: map['model_name'] as String? ?? 'Basic',
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
@@ -416,15 +424,17 @@ class DatabaseService {
       ),
       fsrsDifficulty: (map['fsrs_difficulty'] as num?)?.toDouble() ?? 0.3,
       fsrsStability: (map['fsrs_stability'] as num?)?.toDouble() ?? 0.0,
-      fsrsRetrievability: (map['fsrs_retrievability'] as num?)?.toDouble() ?? 1.0,
+      fsrsRetrievability:
+          (map['fsrs_retrievability'] as num?)?.toDouble() ?? 1.0,
       dueDate: DateTime.parse(map['due_date'] as String),
       intervalDays: map['interval_days'] as int? ?? 0,
       easeFactor: (map['ease_factor'] as num?)?.toDouble() ?? 2.5,
       reviewsCount: map['reviews_count'] as int? ?? 0,
       lapsesCount: map['lapses_count'] as int? ?? 0,
-      lastReviewAt: map['last_review_at'] != null
-          ? DateTime.parse(map['last_review_at'] as String)
-          : null,
+      lastReviewAt:
+          map['last_review_at'] != null
+              ? DateTime.parse(map['last_review_at'] as String)
+              : null,
       createdAt: DateTime.parse(map['created_at'] as String),
       updatedAt: DateTime.parse(map['updated_at'] as String),
       ankiCardId: map['anki_card_id'] as int?,
@@ -506,14 +516,17 @@ class DatabaseService {
     final db = await database;
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
-    
-    final result = await db.rawQuery('''
+
+    final result = await db.rawQuery(
+      '''
       SELECT COUNT(*) as count 
       FROM cards 
       WHERE last_review_at IS NOT NULL 
       AND last_review_at >= ?
-    ''', [todayStart]);
-    
+    ''',
+      [todayStart],
+    );
+
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
@@ -522,7 +535,7 @@ class DatabaseService {
     final db = await database;
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
-    
+
     // Um log onde o intervalo *antes* era 0 indica que o card era novo
     String query = '''
       SELECT COUNT(DISTINCT card_id) as count 
@@ -540,7 +553,7 @@ class DatabaseService {
       ''';
       args.add(deckId);
     }
-    
+
     final result = await db.rawQuery(query, args);
     return Sqflite.firstIntValue(result) ?? 0;
   }
@@ -550,7 +563,7 @@ class DatabaseService {
     final db = await database;
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
-    
+
     // Um log onde o intervalo *antes* era > 0 indica que já não era novo
     String query = '''
       SELECT COUNT(DISTINCT card_id) as count 
@@ -568,7 +581,7 @@ class DatabaseService {
       ''';
       args.add(deckId);
     }
-    
+
     final result = await db.rawQuery(query, args);
     return Sqflite.firstIntValue(result) ?? 0;
   }
@@ -580,4 +593,3 @@ class DatabaseService {
     _database = null;
   }
 }
-

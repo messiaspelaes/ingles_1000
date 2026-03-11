@@ -41,6 +41,7 @@ flutter:
 
   assets:
     - assets/icon.png
+    - assets/decks/ingles_1000.apkg
 
 flutter_launcher_icons:
   android: true

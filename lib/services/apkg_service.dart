@@ -13,6 +13,8 @@
 
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
@@ -35,6 +37,17 @@ class ApkgService {
       return await importApkgFromBytes(bytes);
     } catch (e) {
       throw Exception('Erro ao importar .apkg: $e');
+    }
+  }
+
+  /// Importa um arquivo .apkg dos assets e retorna os dados extraídos
+  Future<ApkgImportResult> importApkgFromAsset(String assetPath) async {
+    try {
+      final ByteData data = await rootBundle.load(assetPath);
+      final bytes = data.buffer.asUint8List();
+      return await importApkgFromBytes(bytes);
+    } catch (e) {
+      throw Exception('Erro ao importar asset .apkg: $e');
     }
   }
 
@@ -165,19 +178,30 @@ class ApkgService {
   Future<Map<String, Uint8List>> _readMedia(Archive archive) async {
     final mediaFiles = <String, Uint8List>{};
 
-    // Ler media.json para mapeamento
+    // O arquivo 'media' (sem extensão) no Anki contém um JSON mapeando:
+    // "id_no_zip": "nome_real_do_arquivo"
+    // Ex: {"0": "audio.mp3", "1": "imagem.png"}
     final mediaJsonEntry = archive.findFile('media');
     if (mediaJsonEntry != null) {
-      // media.json contém mapeamento de nomes de arquivos
-      // Por enquanto, extraímos todos os arquivos da pasta media/
-      for (final file in archive.files) {
-        if (file.name.startsWith('media/') && !file.isFile) {
-          continue;
+      try {
+        final mediaJsonContent = utf8.decode(
+          mediaJsonEntry.content as List<int>,
+        );
+        final Map<String, dynamic> mediaMap = json.decode(mediaJsonContent);
+
+        for (final entry in mediaMap.entries) {
+          final zipFileName = entry.key; // "0", "1", etc.
+          final realFileName = entry.value as String; // "audio.mp3"
+
+          final fileInZip = archive.findFile(zipFileName);
+          if (fileInZip != null) {
+            mediaFiles[realFileName] = Uint8List.fromList(
+              fileInZip.content as List<int>,
+            );
+          }
         }
-        if (file.name.startsWith('media/')) {
-          final filename = file.name.replaceFirst('media/', '');
-          mediaFiles[filename] = Uint8List.fromList(file.content);
-        }
+      } catch (e) {
+        print('Erro ao processar media.json: $e');
       }
     }
 
