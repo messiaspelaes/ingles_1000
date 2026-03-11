@@ -256,11 +256,35 @@ class DatabaseService {
   // CARDS
   // ============================================================================
 
+  /// Obtém cards novos que ainda não foram estudados
+  Future<List<Card>> getNewCards({String? deckId, int limit = 10}) async {
+    final db = await database;
+    
+    String whereClause = 'queue_type = ?';
+    List<dynamic> whereArgs = ['NEW'];
+    
+    if (deckId != null) {
+      whereClause += ' AND deck_id = ?';
+      whereArgs.add(deckId);
+    }
+
+    final maps = await db.query(
+      'cards',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'created_at ASC', // Mais antigos primeiro
+      limit: limit,
+    );
+
+    return maps.map((map) => _cardFromMap(map)).toList();
+  }
+
   /// Obtém cards que estão vencidos (due) para revisão
-  Future<List<Card>> getDueCards({String? deckId}) async {
+  Future<List<Card>> getReviewCards({String? deckId, int limit = 10}) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
     
+    // Pega cards vencidos que estão nas filas de REVISÃO, APRENDIZADO ou RE-APRENDIZADO
     String whereClause = 'due_date <= ? AND queue_type != ?';
     List<dynamic> whereArgs = [now, 'NEW'];
     
@@ -273,8 +297,8 @@ class DatabaseService {
       'cards',
       where: whereClause,
       whereArgs: whereArgs,
-      orderBy: 'due_date ASC',
-      limit: 50,
+      orderBy: 'due_date ASC', // Mais atrasados primeiro
+      limit: limit,
     );
 
     return maps.map((map) => _cardFromMap(map)).toList();
@@ -490,6 +514,62 @@ class DatabaseService {
       AND last_review_at >= ?
     ''', [todayStart]);
     
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// Estatísticas: Obtém quantos cards novos foram estudados hoje
+  Future<int> getStudiedNewCardsTodayCount({String? deckId}) async {
+    final db = await database;
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
+    
+    // Um log onde o intervalo *antes* era 0 indica que o card era novo
+    String query = '''
+      SELECT COUNT(DISTINCT card_id) as count 
+      FROM review_logs 
+      WHERE reviewed_at >= ? AND interval_before = 0
+    ''';
+    List<dynamic> args = [todayStart];
+
+    if (deckId != null) {
+      query = '''
+        SELECT COUNT(DISTINCT r.card_id) as count 
+        FROM review_logs r
+        JOIN cards c ON r.card_id = c.id
+        WHERE r.reviewed_at >= ? AND r.interval_before = 0 AND c.deck_id = ?
+      ''';
+      args.add(deckId);
+    }
+    
+    final result = await db.rawQuery(query, args);
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// Estatísticas: Obtém quantos cards de revisão foram estudados hoje
+  Future<int> getStudiedReviewCardsTodayCount({String? deckId}) async {
+    final db = await database;
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day).toIso8601String();
+    
+    // Um log onde o intervalo *antes* era > 0 indica que já não era novo
+    String query = '''
+      SELECT COUNT(DISTINCT card_id) as count 
+      FROM review_logs 
+      WHERE reviewed_at >= ? AND interval_before > 0
+    ''';
+    List<dynamic> args = [todayStart];
+
+    if (deckId != null) {
+      query = '''
+        SELECT COUNT(DISTINCT r.card_id) as count 
+        FROM review_logs r
+        JOIN cards c ON r.card_id = c.id
+        WHERE r.reviewed_at >= ? AND r.interval_before > 0 AND c.deck_id = ?
+      ''';
+      args.add(deckId);
+    }
+    
+    final result = await db.rawQuery(query, args);
     return Sqflite.firstIntValue(result) ?? 0;
   }
 

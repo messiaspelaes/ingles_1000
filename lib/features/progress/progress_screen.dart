@@ -38,14 +38,15 @@ class _ProgressScreenState extends State<ProgressScreen> {
 
     try {
       // Buscar estatísticas do banco local
-      final dueCards = await _databaseService.getDueCards();
+      final newCards = await _databaseService.getNewCards(limit: 999999);
+      final reviewCards = await _databaseService.getReviewCards(limit: 999999);
       final totalCards = await _databaseService.getTotalCardsCount();
       final reviewedToday = await _databaseService.getReviewedTodayCount();
       
       if (mounted) {
         setState(() {
           _totalCards = totalCards;
-          _dueCards = dueCards.length;
+          _dueCards = newCards.length + reviewCards.length;
           _reviewedToday = reviewedToday;
           _isLoading = false;
         });

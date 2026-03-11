@@ -32,6 +32,12 @@ class _StudyScreenState extends State<StudyScreen> {
   Note? _currentNote;
   bool _showAnswer = false;
   bool _isLoading = false;
+  
+  // Contadores para UI
+  int _novosRestantes = 0;
+  int _revisoesRestantes = 0;
+  final int _limitNovos = 10;
+  final int _limitRevisoes = 10;
 
   @override
   void initState() {
@@ -48,20 +54,47 @@ class _StudyScreenState extends State<StudyScreen> {
     });
 
     try {
-      final dueCards = await _databaseService.getDueCards();
+      // Pegar quantos já foram estudados hoje
+      final int novosEstudados = await _databaseService.getStudiedNewCardsTodayCount();
+      final int revisoesEstudadas = await _databaseService.getStudiedReviewCardsTodayCount();
+
+      // Calcular quantos restam para hoje
+      final int novosRestantes = (_limitNovos - novosEstudados).clamp(0, _limitNovos);
+      final int revisoesRestantes = (_limitRevisoes - revisoesEstudadas).clamp(0, _limitRevisoes);
+
+      Card? nextCard;
+
+      // Prioridade 1: Revisões pendentes
+      if (revisoesRestantes > 0) {
+        final reviewCards = await _databaseService.getReviewCards(limit: revisoesRestantes);
+        if (reviewCards.isNotEmpty) {
+          nextCard = reviewCards.first;
+        }
+      }
+
+      // Prioridade 2: Se não tem revisão ou acabaram, puxar novos
+      if (nextCard == null && novosRestantes > 0) {
+        final newCards = await _databaseService.getNewCards(limit: novosRestantes);
+        if (newCards.isNotEmpty) {
+          nextCard = newCards.first;
+        }
+      }
       
-      if (dueCards.isNotEmpty && mounted) {
-        final card = dueCards.first;
-        final note = await _databaseService.getNoteById(card.noteId);
+      if (nextCard != null && mounted) {
+        final note = await _databaseService.getNoteById(nextCard.noteId);
         
         setState(() {
-          _currentCard = card;
+          _currentCard = nextCard;
           _currentNote = note;
+          _novosRestantes = novosRestantes;
+          _revisoesRestantes = revisoesRestantes;
         });
       } else if (mounted) {
         setState(() {
           _currentCard = null;
           _currentNote = null;
+          _novosRestantes = novosRestantes;
+          _revisoesRestantes = revisoesRestantes;
         });
       }
     } catch (e) {
@@ -139,8 +172,29 @@ class _StudyScreenState extends State<StudyScreen> {
     if (_currentCard == null && _currentNote == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Estudar')),
-        body: const Center(
-          child: Text('Nenhum card disponível para revisão'),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle_outline, size: 80, color: Colors.green[300]),
+              const SizedBox(height: 16),
+              const Text(
+                'Parabéns!',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Você completou a sua meta de estudos de hoje.\nVolte amanhã para mais!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Voltar ao Menu'),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -159,6 +213,43 @@ class _StudyScreenState extends State<StudyScreen> {
       ),
       body: Column(
         children: [
+          // Progresso Hibrido
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.blue[50],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.fiber_new, color: Colors.blue[700], size: 20),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Novos: \u0024_novosRestantes / \u0024_limitNovos',
+                      style: TextStyle(
+                        color: Colors.blue[800],
+                        fontWeight: _currentCard?.queueType == CardQueueType.newCard ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Icon(Icons.history, color: Colors.orange[700], size: 20),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Revisão: \u0024_revisoesRestantes / \u0024_limitRevisoes',
+                      style: TextStyle(
+                        color: Colors.orange[800],
+                        fontWeight: _currentCard?.queueType != CardQueueType.newCard ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          
           // Card
           Expanded(
             child: Center(
