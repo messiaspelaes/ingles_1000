@@ -217,13 +217,13 @@ class _StudyScreenState extends State<StudyScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: Colors.blue[50],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            child: Column(
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.fiber_new, color: Colors.blue[700], size: 20),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 8),
                     Text(
                       'Novos: \u0024_novosRestantes / \u0024_limitNovos',
                       style: TextStyle(
@@ -233,10 +233,12 @@ class _StudyScreenState extends State<StudyScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 4),
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.history, color: Colors.orange[700], size: 20),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 8),
                     Text(
                       'Revisão: \u0024_revisoesRestantes / \u0024_limitRevisoes',
                       style: TextStyle(
