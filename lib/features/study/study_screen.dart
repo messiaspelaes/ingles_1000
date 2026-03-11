@@ -15,6 +15,7 @@ import '../../models/card.dart';
 import '../../models/note.dart';
 import '../../services/fsrs_service.dart';
 import '../../services/database_service.dart';
+import '../../core/widgets/anki_content.dart';
 
 /// Tela de estudo com cards
 class StudyScreen extends StatefulWidget {
@@ -255,59 +256,64 @@ class _StudyScreenState extends State<StudyScreen> {
           // Card
           Expanded(
             child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Material(
-                    elevation: 8,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    color: Colors.white,
-                    child: Container(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Material(
+                  elevation: 8,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  color: Colors.white,
+                  child: Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        if (!_showAnswer)
-                          Text(
-                            _currentNote?.frontField ?? 'Pergunta',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          )
-                        else
-                          Column(
-                            children: [
-                              Text(
-                                _currentNote?.frontField ?? 'Pergunta',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                textAlign: TextAlign.center,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (!_showAnswer)
+                            AnkiContent(
+                              content: _currentNote?.frontField ?? 'Pergunta',
+                              deckId: _currentCard?.deckId ?? '',
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
                               ),
-                              const SizedBox(height: 24),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  _currentNote?.backField ?? 'Resposta',
+                              textAlign: TextAlign.center,
+                            )
+                          else
+                            Column(
+                              children: [
+                                AnkiContent(
+                                  content: _currentNote?.frontField ?? 'Pergunta',
+                                  deckId: _currentCard?.deckId ?? '',
                                   style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-                              ),
-                            ],
-                          ),
-                      ],
+                                const SizedBox(height: 24),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: AnkiContent(
+                                    content: _currentNote?.backField ?? 'Resposta',
+                                    deckId: _currentCard?.deckId ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
