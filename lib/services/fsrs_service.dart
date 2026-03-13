@@ -10,9 +10,9 @@
  * Utiliza FSRS (Free Spaced Repetition Scheduler) - https://github.com/open-spaced-repetition/fsrs4anki
  */
 
-import 'package:flutter/foundation.dart';
 import 'fsrs/fsrs_executor.dart';
 import '../models/card.dart';
+import '../utils/app_logger.dart';
 
 /// Serviço para calcular intervalos usando FSRS
 /// Integra fsrs.js via flutter_js
@@ -35,7 +35,7 @@ class FsrsService {
         await _executor!.initialize();
       } catch (e) {
         // Se o runtime JS não estiver disponível, usa apenas fallback
-        debugPrint('Aviso: Runtime JavaScript não disponível, usando cálculo fallback: $e');
+        AppLogger.w(LogCategory.fsrs, 'Runtime JavaScript não disponível, usando cálculo fallback: $e');
         _executor = null;
       }
       
@@ -44,7 +44,7 @@ class FsrsService {
       // Em caso de erro, marca como inicializado mas sem JS runtime
       _initialized = true;
       _executor = null;
-      debugPrint('Erro ao inicializar FSRS, usando cálculo fallback: $e');
+      AppLogger.e(LogCategory.fsrs, 'Erro ao inicializar FSRS, usando cálculo fallback', e);
     }
   }
 
@@ -87,8 +87,8 @@ class FsrsService {
         intervalDays: (resultMap['interval'] as num).toInt(),
         dueDate: DateTime.fromMillisecondsSinceEpoch(resultMap['dueDate'] as int),
       );
-    } catch (e) {
-      debugPrint('Erro no cálculo FSRS: $e');
+    } catch (e, stack) {
+      AppLogger.e(LogCategory.fsrs, 'Erro no cálculo FSRS', e, stack);
       // Fallback para cálculo simples se FSRS falhar
       return _calculateFallback(card, rating, now);
     }

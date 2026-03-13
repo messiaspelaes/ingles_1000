@@ -16,6 +16,7 @@ import '../models/deck.dart';
 import '../models/note.dart';
 import '../models/card.dart';
 import '../models/review_log.dart';
+import '../utils/app_logger.dart';
 import 'dart:convert';
 
 /// Serviço de banco de dados local SQLite
@@ -43,11 +44,16 @@ class DatabaseService {
       version: _databaseVersion,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
+      onOpen: (db) {
+        AppLogger.i(LogCategory.db, 'Banco de dados aberto no caminho: $dbPath');
+      },
     );
   }
 
   /// Cria as tabelas na primeira execução
   Future<void> _onCreate(Database db, int version) async {
+    AppLogger.i(LogCategory.db, 'Criando tabelas do banco de dados...');
+    
     // Tabela de Decks
     await db.execute('''
       CREATE TABLE decks (
@@ -143,6 +149,8 @@ class DatabaseService {
     await db.execute(
       'CREATE INDEX idx_review_logs_card ON review_logs(card_id)',
     );
+
+    AppLogger.s(LogCategory.db, 'Tabelas criadas com sucesso!');
   }
 
   /// Atualiza o banco em versões futuras

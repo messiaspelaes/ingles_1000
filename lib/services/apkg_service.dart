@@ -19,6 +19,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:archive/archive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
+import '../utils/app_logger.dart';
 
 /// Serviço para importar arquivos .apkg do Anki
 /// Adaptado do código do AnkiDroid
@@ -183,7 +184,7 @@ class ApkgService {
     // Ex: {"0": "audio.mp3", "1": "imagem.png"}
     final mediaJsonEntry = archive.findFile('media');
     if (mediaJsonEntry == null) {
-      print('[ApkgService] Arquivo "media" não encontrado no ZIP');
+      AppLogger.w(LogCategory.apkg, 'Arquivo "media" não encontrado no ZIP');
       return mediaFiles;
     }
 
@@ -192,7 +193,7 @@ class ApkgService {
         mediaJsonEntry.content as List<int>,
       );
       final Map<String, dynamic> mediaMap = json.decode(mediaJsonContent);
-      print('[ApkgService] Media JSON: ${mediaMap.length} entradas encontradas');
+      AppLogger.i(LogCategory.apkg, 'Media JSON: ${mediaMap.length} entradas encontradas');
 
       // Criar um mapa de nome -> ArchiveFile para busca eficiente
       final archiveMap = <String, ArchiveFile>{};
@@ -215,16 +216,21 @@ class ApkgService {
               found++;
             }
           } catch (e) {
-            print('[ApkgService] Erro ao ler conteúdo de "$zipFileName" ($realFileName): $e');
+            AppLogger.e(LogCategory.apkg, 'Erro ao ler conteúdo de "$zipFileName" ($realFileName)', e);
             notFound++;
           }
         } else {
           notFound++;
         }
       }
-      print('[ApkgService] Mídia: $found extraídos, $notFound não encontrados');
+      
+      if (notFound == 0) {
+        AppLogger.s(LogCategory.apkg, 'Mídia: $found extraídos com sucesso');
+      } else {
+        AppLogger.w(LogCategory.apkg, 'Mídia: $found extraídos, $notFound não encontrados');
+      }
     } catch (e) {
-      print('[ApkgService] Erro ao processar media JSON: $e');
+      AppLogger.e(LogCategory.apkg, 'Erro ao processar media JSON', e);
     }
 
     return mediaFiles;

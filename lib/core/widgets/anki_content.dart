@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import '../../utils/app_logger.dart';
 
 /// Widget que processa e renderiza texto do Anki, incluindo tags de som [sound:...]
 class AnkiContent extends StatefulWidget {
@@ -49,38 +50,36 @@ class _AnkiContentState extends State<AnkiContent> {
       final String deckMediaDir = '$mediaBaseDir/${widget.deckId}';
       final String filePath = '$deckMediaDir/$filename';
       
-      print('[AnkiContent] Tentando tocar: $filename');
-      print('[AnkiContent] DeckId: ${widget.deckId}');
-      print('[AnkiContent] Caminho completo: $filePath');
+      AppLogger.i(LogCategory.audio, 'Tentando tocar: $filename | DeckId: ${widget.deckId}');
       
       final file = File(filePath);
       if (file.existsSync()) {
-        print('[AnkiContent] Arquivo encontrado! Tamanho: ${file.lengthSync()} bytes');
+        AppLogger.s(LogCategory.audio, 'Arquivo encontrado! Tamanho: ${file.lengthSync()} bytes');
         await _audioPlayer.play(DeviceFileSource(filePath));
       } else {
-        print('[AnkiContent] ARQUIVO NÃO ENCONTRADO: $filePath');
+        AppLogger.w(LogCategory.audio, 'Arquivo não encontrado no path principal: $filePath');
         
         // Diagnóstico: listar diretórios disponíveis em media/
         final mediaDirObj = Directory(mediaBaseDir);
         if (mediaDirObj.existsSync()) {
           final dirs = mediaDirObj.listSync();
-          print('[AnkiContent] Pastas em media/: ${dirs.map((d) => d.path.split('/').last).toList()}');
+          // AppLogger.i(LogCategory.audio, 'Pastas em media/: ${dirs.map((d) => d.path.split('/').last).toList()}');
           
           // Verificar se o arquivo existe em alguma pasta de media
           for (final d in dirs) {
             if (d is Directory) {
               final checkFile = File('${d.path}/$filename');
               if (checkFile.existsSync()) {
-                print('[AnkiContent] *** ENCONTRADO em ${d.path} ***');
+                AppLogger.s(LogCategory.audio, 'Arquivo encontrado no fallback: ${d.path}');
                 // Tocar do caminho correto
                 await _audioPlayer.play(DeviceFileSource(checkFile.path));
                 return;
               }
             }
           }
-          print('[AnkiContent] Arquivo não encontrado em nenhuma pasta de media');
+          AppLogger.e(LogCategory.audio, 'Arquivo definitivo não encontrado em nenhuma pasta', filename);
         } else {
-          print('[AnkiContent] Diretório media/ NÃO EXISTE: $mediaBaseDir');
+          AppLogger.e(LogCategory.audio, 'Diretório media/ não existe', mediaBaseDir);
         }
         
         if (mounted) {
@@ -89,8 +88,8 @@ class _AnkiContentState extends State<AnkiContent> {
           );
         }
       }
-    } catch (e) {
-      print('[AnkiContent] Erro ao tocar áudio: $e');
+    } catch (e, stack) {
+      AppLogger.e(LogCategory.audio, 'Erro geral no player de áudio', e, stack);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
            SnackBar(content: Text('Erro ao tocar áudio: $e')),

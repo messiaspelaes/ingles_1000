@@ -9,6 +9,7 @@ import 'services/apkg_service.dart';
 import 'models/note.dart';
 import 'models/card.dart' as app_card;
 import 'utils/date_utils.dart' as app_date_utils;
+import 'utils/app_logger.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -128,22 +129,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 5. Salvar mídias
     if (importResult.mediaFiles.isNotEmpty) {
-      print('[HomeScreen] Salvando ${importResult.mediaFiles.length} arquivos de mídia para deck $deckId');
+      AppLogger.i(LogCategory.general, 'Salvando ${importResult.mediaFiles.length} arquivos de mídia para deck $deckId');
       final dir = await getApplicationDocumentsDirectory();
       final mediaDir = Directory('${dir.path}/media/$deckId');
       if (!await mediaDir.exists()) {
         await mediaDir.create(recursive: true);
       }
-      print('[HomeScreen] Diretório de mídia: ${mediaDir.path}');
+      AppLogger.i(LogCategory.general, 'Diretório de mídia: ${mediaDir.path}');
       int saved = 0;
       for (final entry in importResult.mediaFiles.entries) {
         final mediaFile = File('${mediaDir.path}/${entry.key}');
         await mediaFile.writeAsBytes(entry.value);
         saved++;
       }
-      print('[HomeScreen] $saved arquivos de mídia salvos com sucesso');
+      AppLogger.s(LogCategory.general, '$saved arquivos de mídia salvos com sucesso');
     } else {
-      print('[HomeScreen] ATENÇÃO: importResult.mediaFiles está VAZIO!');
+      AppLogger.w(LogCategory.general, 'ATENÇÃO: importResult.mediaFiles está VAZIO!');
     }
   }
 
