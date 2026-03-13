@@ -287,7 +287,7 @@ class DatabaseService {
   }
 
   /// Obtém cards que estão vencidos (due) para revisão
-  Future<List<Card>> getReviewCards({String? deckId, int limit = 10}) async {
+  Future<List<Card>> getReviewCards({String? deckId, int? limit}) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
 

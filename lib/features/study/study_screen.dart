@@ -13,6 +13,7 @@
 import 'package:flutter/material.dart' hide Card;
 import '../../models/card.dart';
 import '../../models/note.dart';
+import '../../models/review_log.dart';
 import '../../services/fsrs_service.dart';
 import '../../services/database_service.dart';
 import '../../core/widgets/anki_content.dart';
@@ -29,85 +30,93 @@ class _StudyScreenState extends State<StudyScreen> {
   final FsrsService _fsrsService = FsrsService();
   final DatabaseService _databaseService = DatabaseService();
 
+  // Fila de cards da sessão atual
+  final List<Card> _newQueue = [];
+  final List<Card> _reviewQueue = [];
+
   Card? _currentCard;
   Note? _currentNote;
   bool _showAnswer = false;
-  bool _isLoading = false;
-  
-  // Contadores para UI
+  bool _isLoading = true;
+
+  // Contadores da sessão (decrementam conforme respostas)
   int _novosRestantes = 0;
   int _revisoesRestantes = 0;
-  final int _limitNovos = 10;
-  final int _limitRevisoes = 10;
+
+  // Para calcular tempo gasto no card
+  DateTime? _cardShownAt;
+
+  // Limite de novos por dia (FSRS padrão = 10)
+  static const int _limitNovos = 10;
 
   @override
   void initState() {
     super.initState();
-    _loadNextCard();
+    _initSession();
   }
 
-  Future<void> _loadNextCard() async {
-    if (!mounted) return;
-    
-    setState(() {
-      _isLoading = true;
-      _showAnswer = false;
-    });
+  /// Inicializa a sessão: carrega as filas e define os contadores
+  Future<void> _initSession() async {
+    setState(() => _isLoading = true);
 
     try {
-      // Pegar quantos já foram estudados hoje
-      final int novosEstudados = await _databaseService.getStudiedNewCardsTodayCount();
-      final int revisoesEstudadas = await _databaseService.getStudiedReviewCardsTodayCount();
+      // Quantos novos já foram estudados hoje (para respeitar o limite diário)
+      final novosHoje = await _databaseService.getStudiedNewCardsTodayCount();
+      final novosPossiveis = (_limitNovos - novosHoje).clamp(0, _limitNovos);
 
-      // Calcular quantos restam para hoje
-      final int novosRestantes = (_limitNovos - novosEstudados).clamp(0, _limitNovos);
-      final int revisoesRestantes = (_limitRevisoes - revisoesEstudadas).clamp(0, _limitRevisoes);
+      // Carregar filas da sessão
+      final novos = await _databaseService.getNewCards(limit: novosPossiveis);
+      final revisoes = await _databaseService.getReviewCards(); // Todos os devidos
 
-      Card? nextCard;
+      _newQueue.clear();
+      _reviewQueue.clear();
+      _newQueue.addAll(novos);
+      _reviewQueue.addAll(revisoes);
 
-      // Prioridade 1: Revisões pendentes
-      if (revisoesRestantes > 0) {
-        final reviewCards = await _databaseService.getReviewCards(limit: revisoesRestantes);
-        if (reviewCards.isNotEmpty) {
-          nextCard = reviewCards.first;
-        }
-      }
+      setState(() {
+        _novosRestantes = _newQueue.length;
+        _revisoesRestantes = _reviewQueue.length;
+      });
 
-      // Prioridade 2: Se não tem revisão ou acabaram, puxar novos
-      if (nextCard == null && novosRestantes > 0) {
-        final newCards = await _databaseService.getNewCards(limit: novosRestantes);
-        if (newCards.isNotEmpty) {
-          nextCard = newCards.first;
-        }
-      }
-      
-      if (nextCard != null && mounted) {
-        final note = await _databaseService.getNoteById(nextCard.noteId);
-        
-        setState(() {
-          _currentCard = nextCard;
-          _currentNote = note;
-          _novosRestantes = novosRestantes;
-          _revisoesRestantes = revisoesRestantes;
-        });
-      } else if (mounted) {
-        setState(() {
-          _currentCard = null;
-          _currentNote = null;
-          _novosRestantes = novosRestantes;
-          _revisoesRestantes = revisoesRestantes;
-        });
-      }
+      await _showNextCard();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao carregar cards: $e')),
+          SnackBar(content: Text('Erro ao iniciar sessão: $e')),
         );
       }
     } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Pega o próximo card da fila e exibe
+  Future<void> _showNextCard() async {
+    Card? next;
+
+    // Prioridade: revisões primeiro, depois novos
+    if (_reviewQueue.isNotEmpty) {
+      next = _reviewQueue.removeAt(0);
+    } else if (_newQueue.isNotEmpty) {
+      next = _newQueue.removeAt(0);
+    }
+
+    if (next != null) {
+      final note = await _databaseService.getNoteById(next.noteId);
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _currentCard = next;
+          _currentNote = note;
+          _showAnswer = false;
+          _cardShownAt = DateTime.now();
+        });
+      }
+    } else {
+      // Sessão encerrada
+      if (mounted) {
+        setState(() {
+          _currentCard = null;
+          _currentNote = null;
         });
       }
     }
@@ -116,16 +125,25 @@ class _StudyScreenState extends State<StudyScreen> {
   Future<void> _answerCard(CardRating rating) async {
     if (_currentCard == null) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
+      final now = DateTime.now();
+      final timeTakenMs = _cardShownAt != null
+          ? now.difference(_cardShownAt!).inMilliseconds
+          : 0;
+
+      // Guardar estado FSRS anterior para o ReviewLog
+      final difficultyBefore = _currentCard!.fsrsDifficulty;
+      final stabilityBefore = _currentCard!.fsrsStability;
+      final intervalBefore = _currentCard!.intervalDays;
+      final wasNew = _currentCard!.queueType == CardQueueType.newCard;
+
       // 1. Calcular próximo estado com FSRS
       final fsrsResult = await _fsrsService.calculateNextState(
         card: _currentCard!,
         rating: rating,
-        now: DateTime.now(),
+        now: now,
       );
 
       // 2. Atualizar card
@@ -134,8 +152,8 @@ class _StudyScreenState extends State<StudyScreen> {
       _currentCard!.intervalDays = fsrsResult.intervalDays;
       _currentCard!.dueDate = fsrsResult.dueDate;
       _currentCard!.reviewsCount++;
-      _currentCard!.lastReviewAt = DateTime.now();
-      _currentCard!.updatedAt = DateTime.now();
+      _currentCard!.lastReviewAt = now;
+      _currentCard!.updatedAt = now;
 
       if (rating == CardRating.again) {
         _currentCard!.lapsesCount++;
@@ -144,11 +162,35 @@ class _StudyScreenState extends State<StudyScreen> {
         _currentCard!.queueType = CardQueueType.review;
       }
 
-      // 3. Salvar no banco local
+      // 3. Salvar card atualizado
       await _databaseService.saveCard(_currentCard!);
 
-      // 4. Carregar próximo card
-      await _loadNextCard();
+      // 4. Salvar ReviewLog (isso é o que faz os contadores funcionarem)
+      final reviewLog = ReviewLog(
+        id: '${now.millisecondsSinceEpoch}_${_currentCard!.id}',
+        cardId: _currentCard!.id,
+        userId: '',
+        rating: rating,
+        intervalBefore: intervalBefore,
+        intervalAfter: fsrsResult.intervalDays,
+        timeTakenMs: timeTakenMs,
+        fsrsDifficultyBefore: difficultyBefore,
+        fsrsStabilityBefore: stabilityBefore,
+        fsrsDifficultyAfter: fsrsResult.difficulty,
+        fsrsStabilityAfter: fsrsResult.stability,
+        reviewedAt: now,
+      );
+      await _databaseService.saveReviewLog(reviewLog);
+
+      // 5. Decrementar contador correto
+      if (wasNew) {
+        setState(() => _novosRestantes = (_novosRestantes - 1).clamp(0, _limitNovos));
+      } else {
+        setState(() => _revisoesRestantes = (_revisoesRestantes - 1).clamp(0, _revisoesRestantes));
+      }
+
+      // 6. Próximo card
+      await _showNextCard();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -156,9 +198,7 @@ class _StudyScreenState extends State<StudyScreen> {
         );
       }
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -180,12 +220,12 @@ class _StudyScreenState extends State<StudyScreen> {
               Icon(Icons.check_circle_outline, size: 80, color: Colors.green[300]),
               const SizedBox(height: 16),
               const Text(
-                'Parabéns!',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                'Parabéns! 🎉',
+                style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Você completou a sua meta de estudos de hoje.\nVolte amanhã para mais!',
+                'Você completou sua sessão de hoje.\nVolte amanhã para continuar!',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
@@ -203,56 +243,35 @@ class _StudyScreenState extends State<StudyScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Estudar'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              // TODO: Mostrar informações do card
-            },
-          ),
-        ],
       ),
       body: Column(
         children: [
-          // Progresso Hibrido
+          // Barra de progresso da sessão
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             color: Colors.blue[50],
-            child: Column(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.fiber_new, color: Colors.blue[700], size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Novos: $_novosRestantes / $_limitNovos',
-                      style: TextStyle(
-                        color: Colors.blue[800],
-                        fontWeight: _currentCard?.queueType == CardQueueType.newCard ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ],
+                _buildCounter(
+                  icon: Icons.fiber_new,
+                  color: Colors.blue[700]!,
+                  label: 'Novos',
+                  value: _novosRestantes,
+                  isCurrent: _currentCard?.queueType == CardQueueType.newCard,
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.history, color: Colors.orange[700], size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Revisão: $_revisoesRestantes / $_limitRevisoes',
-                      style: TextStyle(
-                        color: Colors.orange[800],
-                        fontWeight: _currentCard?.queueType != CardQueueType.newCard ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 32),
+                _buildCounter(
+                  icon: Icons.history,
+                  color: Colors.orange[700]!,
+                  label: 'Revisão',
+                  value: _revisoesRestantes,
+                  isCurrent: _currentCard?.queueType != CardQueueType.newCard,
                 ),
               ],
             ),
           ),
-          
+
           // Card
           Expanded(
             child: Center(
@@ -273,7 +292,7 @@ class _StudyScreenState extends State<StudyScreen> {
                         children: [
                           if (!_showAnswer)
                             AnkiContent(
-                              content: _currentNote?.frontField ?? 'Pergunta',
+                              content: _currentNote?.frontField ?? '',
                               deckId: _currentCard?.deckId ?? '',
                               style: const TextStyle(
                                 fontSize: 24,
@@ -285,7 +304,7 @@ class _StudyScreenState extends State<StudyScreen> {
                             Column(
                               children: [
                                 AnkiContent(
-                                  content: _currentNote?.frontField ?? 'Pergunta',
+                                  content: _currentNote?.frontField ?? '',
                                   deckId: _currentCard?.deckId ?? '',
                                   style: const TextStyle(
                                     fontSize: 20,
@@ -301,7 +320,7 @@ class _StudyScreenState extends State<StudyScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: AnkiContent(
-                                    content: _currentNote?.backField ?? 'Resposta',
+                                    content: _currentNote?.backField ?? '',
                                     deckId: _currentCard?.deckId ?? '',
                                     style: const TextStyle(
                                       fontSize: 22,
@@ -321,7 +340,7 @@ class _StudyScreenState extends State<StudyScreen> {
             ),
           ),
 
-          // Botões de resposta
+          // Botões
           if (_showAnswer)
             Container(
               padding: const EdgeInsets.all(16),
@@ -339,26 +358,10 @@ class _StudyScreenState extends State<StudyScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildAnswerButton(
-                      'Novamente',
-                      CardRating.again,
-                      Colors.red,
-                    ),
-                    _buildAnswerButton(
-                      'Difícil',
-                      CardRating.hard,
-                      Colors.orange,
-                    ),
-                    _buildAnswerButton(
-                      'Bom',
-                      CardRating.good,
-                      Colors.blue,
-                    ),
-                    _buildAnswerButton(
-                      'Fácil',
-                      CardRating.easy,
-                      Colors.green,
-                    ),
+                    _buildAnswerButton('Novamente', CardRating.again, Colors.red),
+                    _buildAnswerButton('Difícil', CardRating.hard, Colors.orange),
+                    _buildAnswerButton('Bom', CardRating.good, Colors.blue),
+                    _buildAnswerButton('Fácil', CardRating.easy, Colors.green),
                   ],
                 ),
               ),
@@ -370,11 +373,7 @@ class _StudyScreenState extends State<StudyScreen> {
                 child: SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _showAnswer = true;
-                      });
-                    },
+                    onPressed: () => setState(() => _showAnswer = true),
                     icon: const Icon(Icons.visibility),
                     label: const Text('Mostrar Resposta'),
                     style: ElevatedButton.styleFrom(
@@ -390,16 +389,35 @@ class _StudyScreenState extends State<StudyScreen> {
     );
   }
 
+  Widget _buildCounter({
+    required IconData icon,
+    required Color color,
+    required String label,
+    required int value,
+    required bool isCurrent,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 6),
+        Text(
+          '$label: $value',
+          style: TextStyle(
+            color: color,
+            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+            fontSize: isCurrent ? 15 : 14,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAnswerButton(String label, CardRating rating, Color color) {
     return Expanded(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: ElevatedButton(
-          onPressed: _isLoading
-              ? null
-              : () {
-                  _answerCard(rating);
-                },
+          onPressed: _isLoading ? null : () => _answerCard(rating),
           style: ElevatedButton.styleFrom(
             backgroundColor: color,
             foregroundColor: Colors.white,
@@ -412,4 +430,3 @@ class _StudyScreenState extends State<StudyScreen> {
     );
   }
 }
-
