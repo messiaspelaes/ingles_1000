@@ -1,3 +1,4 @@
+// ignore_for_file: avoid_print
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:sqlite3/sqlite3.dart';
@@ -36,7 +37,7 @@ void main() async {
         final cards = db.select('SELECT count(*) FROM cards');
         print('Cards count: ${cards.first.values.first}');
       }
-      db.dispose();
+      db.close();
     } catch (e) {
       print('Error lendo banco: $e');
     }

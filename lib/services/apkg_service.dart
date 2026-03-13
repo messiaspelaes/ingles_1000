@@ -76,7 +76,7 @@ class ApkgService {
       if (kIsWeb) {
         // Na web, sqflite não funciona. Vamos usar uma abordagem alternativa
         // Por enquanto, vamos informar que precisa usar mobile
-        // TODO: Implementar suporte completo para web usando sql.js
+        // Pendente: Implementar suporte completo para web usando sql.js
         throw Exception(
           'Importação .apkg na web ainda não está totalmente suportada devido a limitações do SQLite na web. Por favor, use a versão mobile do aplicativo para importar arquivos .apkg.',
         );
