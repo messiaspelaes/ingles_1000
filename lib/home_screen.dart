@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'features/import/import_screen.dart';
 import 'features/study/study_screen.dart';
 import 'features/progress/progress_screen.dart';
 import 'core/license/about_screen.dart';
@@ -175,25 +174,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 60),
-
-                  // Botão de importar
-                  _buildOptionCard(
-                    context,
-                    icon: Icons.upload_file,
-                    title: "Importar Deck",
-                    subtitle: "Importe arquivos .apkg do Anki",
-                    color: Colors.purple[400]!,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ImportScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 20),
 
                   // Botão de estudo
                   _buildOptionCard(
