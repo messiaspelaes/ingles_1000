@@ -182,27 +182,49 @@ class ApkgService {
     // "id_no_zip": "nome_real_do_arquivo"
     // Ex: {"0": "audio.mp3", "1": "imagem.png"}
     final mediaJsonEntry = archive.findFile('media');
-    if (mediaJsonEntry != null) {
-      try {
-        final mediaJsonContent = utf8.decode(
-          mediaJsonEntry.content as List<int>,
-        );
-        final Map<String, dynamic> mediaMap = json.decode(mediaJsonContent);
+    if (mediaJsonEntry == null) {
+      print('[ApkgService] Arquivo "media" não encontrado no ZIP');
+      return mediaFiles;
+    }
 
-        for (final entry in mediaMap.entries) {
-          final zipFileName = entry.key; // "0", "1", etc.
-          final realFileName = entry.value as String; // "audio.mp3"
+    try {
+      final mediaJsonContent = utf8.decode(
+        mediaJsonEntry.content as List<int>,
+      );
+      final Map<String, dynamic> mediaMap = json.decode(mediaJsonContent);
+      print('[ApkgService] Media JSON: ${mediaMap.length} entradas encontradas');
 
-          final fileInZip = archive.findFile(zipFileName);
-          if (fileInZip != null) {
-            mediaFiles[realFileName] = Uint8List.fromList(
-              fileInZip.content as List<int>,
-            );
-          }
-        }
-      } catch (e) {
-        print('Erro ao processar media.json: $e');
+      // Criar um mapa de nome -> ArchiveFile para busca eficiente
+      final archiveMap = <String, ArchiveFile>{};
+      for (final file in archive) {
+        archiveMap[file.name] = file;
       }
+
+      int found = 0;
+      int notFound = 0;
+      for (final entry in mediaMap.entries) {
+        final zipFileName = entry.key; // "0", "1", etc.
+        final realFileName = entry.value as String; // "audio.mp3"
+
+        final fileInZip = archiveMap[zipFileName];
+        if (fileInZip != null) {
+          try {
+            final content = fileInZip.content;
+            if (content != null && content is List<int>) {
+              mediaFiles[realFileName] = Uint8List.fromList(content);
+              found++;
+            }
+          } catch (e) {
+            print('[ApkgService] Erro ao ler conteúdo de "$zipFileName" ($realFileName): $e');
+            notFound++;
+          }
+        } else {
+          notFound++;
+        }
+      }
+      print('[ApkgService] Mídia: $found extraídos, $notFound não encontrados');
+    } catch (e) {
+      print('[ApkgService] Erro ao processar media JSON: $e');
     }
 
     return mediaFiles;

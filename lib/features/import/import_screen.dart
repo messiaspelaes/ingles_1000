@@ -163,6 +163,7 @@ class _ImportScreenState extends State<ImportScreen> {
 
       // 6. Salvar arquivos de mídia
       if (importResult.mediaFiles.isNotEmpty) {
+        print('[ImportScreen] Salvando ${importResult.mediaFiles.length} arquivos de mídia para deck $deckId');
         final dir = await getApplicationDocumentsDirectory();
         final mediaDir = Directory('${dir.path}/media/$deckId');
 
@@ -171,13 +172,18 @@ class _ImportScreenState extends State<ImportScreen> {
           await mediaDir.create(recursive: true);
         }
 
+        int saved = 0;
         for (final entry in importResult.mediaFiles.entries) {
           final fileName = entry.key;
           final fileBytes = entry.value;
 
           final mediaFile = File('${mediaDir.path}/$fileName');
           await mediaFile.writeAsBytes(fileBytes);
+          saved++;
         }
+        print('[ImportScreen] $saved arquivos salvos em: ${mediaDir.path}');
+      } else {
+        print('[ImportScreen] ATENÇÃO: Nenhum arquivo de mídia extraído do APKG!');
       }
 
       setState(() {

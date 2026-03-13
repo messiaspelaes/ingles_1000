@@ -45,31 +45,62 @@ class _AnkiContentState extends State<AnkiContent> {
 
     try {
       final dir = await getApplicationDocumentsDirectory();
-      // O banco de dados do Media salva arquivos dentro da pasta do deck
-      final String filePath = '${dir.path}/media/${widget.deckId}/$filename';
+      final String mediaBaseDir = '${dir.path}/media';
+      final String deckMediaDir = '$mediaBaseDir/${widget.deckId}';
+      final String filePath = '$deckMediaDir/$filename';
       
-      if (File(filePath).existsSync()) {
+      print('[AnkiContent] Tentando tocar: $filename');
+      print('[AnkiContent] DeckId: ${widget.deckId}');
+      print('[AnkiContent] Caminho completo: $filePath');
+      
+      final file = File(filePath);
+      if (file.existsSync()) {
+        print('[AnkiContent] Arquivo encontrado! Tamanho: ${file.lengthSync()} bytes');
         await _audioPlayer.play(DeviceFileSource(filePath));
       } else {
+        print('[AnkiContent] ARQUIVO NÃO ENCONTRADO: $filePath');
+        
+        // Diagnóstico: listar diretórios disponíveis em media/
+        final mediaDirObj = Directory(mediaBaseDir);
+        if (mediaDirObj.existsSync()) {
+          final dirs = mediaDirObj.listSync();
+          print('[AnkiContent] Pastas em media/: ${dirs.map((d) => d.path.split('/').last).toList()}');
+          
+          // Verificar se o arquivo existe em alguma pasta de media
+          for (final d in dirs) {
+            if (d is Directory) {
+              final checkFile = File('${d.path}/$filename');
+              if (checkFile.existsSync()) {
+                print('[AnkiContent] *** ENCONTRADO em ${d.path} ***');
+                // Tocar do caminho correto
+                await _audioPlayer.play(DeviceFileSource(checkFile.path));
+                return;
+              }
+            }
+          }
+          print('[AnkiContent] Arquivo não encontrado em nenhuma pasta de media');
+        } else {
+          print('[AnkiContent] Diretório media/ NÃO EXISTE: $mediaBaseDir');
+        }
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Arquivo de áudio não encontrado offline')),
+            SnackBar(content: Text('Áudio não encontrado: $filename')),
           );
         }
       }
     } catch (e) {
+      print('[AnkiContent] Erro ao tocar áudio: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-           SnackBar(content: Text('Erro ao tocar áudio: \$e')),
+           SnackBar(content: Text('Erro ao tocar áudio: $e')),
         );
       }
     } finally {
-      // Audioplayers no complete não reseta sozinho perfeitamente sem listener
       _audioPlayer.onPlayerComplete.listen((event) {
         if (mounted) setState(() => _isPlaying = false);
       });
-      // Em caso de erro garantimos q volta ao play normal dps de um tempo (fallback)
-      Future.delayed(const Duration(seconds: 2), () {
+      Future.delayed(const Duration(seconds: 5), () {
         if (mounted && _isPlaying) setState(() => _isPlaying = false);
       });
     }

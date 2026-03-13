@@ -129,15 +129,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // 5. Salvar mídias
     if (importResult.mediaFiles.isNotEmpty) {
+      print('[HomeScreen] Salvando ${importResult.mediaFiles.length} arquivos de mídia para deck $deckId');
       final dir = await getApplicationDocumentsDirectory();
       final mediaDir = Directory('${dir.path}/media/$deckId');
       if (!await mediaDir.exists()) {
         await mediaDir.create(recursive: true);
       }
+      print('[HomeScreen] Diretório de mídia: ${mediaDir.path}');
+      int saved = 0;
       for (final entry in importResult.mediaFiles.entries) {
         final mediaFile = File('${mediaDir.path}/${entry.key}');
         await mediaFile.writeAsBytes(entry.value);
+        saved++;
       }
+      print('[HomeScreen] $saved arquivos de mídia salvos com sucesso');
+    } else {
+      print('[HomeScreen] ATENÇÃO: importResult.mediaFiles está VAZIO!');
     }
   }
 
