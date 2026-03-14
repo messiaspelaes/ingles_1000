@@ -10,6 +10,7 @@ class AnkiContent extends StatefulWidget {
   final String deckId;
   final TextStyle? style;
   final TextAlign? textAlign;
+  final bool autoPlay;
 
   const AnkiContent({
     super.key,
@@ -17,6 +18,7 @@ class AnkiContent extends StatefulWidget {
     required this.deckId,
     this.style,
     this.textAlign,
+    this.autoPlay = false,
   });
 
   @override
@@ -27,6 +29,34 @@ class _AnkiContentState extends State<AnkiContent> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
   
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer.onPlayerComplete.listen((event) {
+      if (mounted) setState(() => _isPlaying = false);
+    });
+    if (widget.autoPlay) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final soundFile = _extractSoundFile(widget.content);
+        if (soundFile != null) {
+          _playSound(soundFile);
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AnkiContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Tocar se o conteúdo mudou ou se o autoPlay foi ativado e o card é o mesmo
+    if (widget.autoPlay && (oldWidget.content != widget.content || (!oldWidget.autoPlay && widget.autoPlay))) {
+      final soundFile = _extractSoundFile(widget.content);
+      if (soundFile != null) {
+        _playSound(soundFile);
+      }
+    }
+  }
+
   // Pegar somente o nome do arquivo, removendo `[sound:` e `]`
   String? _extractSoundFile(String text) {
     final regex = RegExp(r'\[sound:(.*?)\]');
@@ -83,6 +113,7 @@ class _AnkiContentState extends State<AnkiContent> {
         }
         
         if (mounted) {
+          setState(() => _isPlaying = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Áudio não encontrado: $filename')),
           );
@@ -91,17 +122,13 @@ class _AnkiContentState extends State<AnkiContent> {
     } catch (e, stack) {
       AppLogger.e(LogCategory.audio, 'Erro geral no player de áudio', e, stack);
       if (mounted) {
+        setState(() => _isPlaying = false);
         ScaffoldMessenger.of(context).showSnackBar(
            SnackBar(content: Text('Erro ao tocar áudio: $e')),
         );
       }
     } finally {
-      _audioPlayer.onPlayerComplete.listen((event) {
-        if (mounted) setState(() => _isPlaying = false);
-      });
-      Future.delayed(const Duration(seconds: 5), () {
-        if (mounted && _isPlaying) setState(() => _isPlaying = false);
-      });
+      // O listener de finalização já está configurado no initState
     }
   }
 

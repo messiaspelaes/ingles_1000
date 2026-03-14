@@ -299,6 +299,7 @@ class _StudyScreenState extends State<StudyScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                               textAlign: TextAlign.center,
+                              autoPlay: true,
                             )
                           else
                             Column(
@@ -311,6 +312,7 @@ class _StudyScreenState extends State<StudyScreen> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                   textAlign: TextAlign.center,
+                                  autoPlay: true,
                                 ),
                                 const SizedBox(height: 24),
                                 Container(
@@ -327,6 +329,7 @@ class _StudyScreenState extends State<StudyScreen> {
                                       fontWeight: FontWeight.bold,
                                     ),
                                     textAlign: TextAlign.center,
+                                    autoPlay: true,
                                   ),
                                 ),
                               ],
