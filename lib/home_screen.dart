@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'features/study/study_screen.dart';
+import 'features/study/all_sentences_screen.dart';
 import 'features/progress/progress_screen.dart';
 import 'core/license/about_screen.dart';
 import 'services/database_service.dart';
@@ -209,6 +210,25 @@ class _HomeScreenState extends State<HomeScreen> {
                         context,
                         MaterialPageRoute(
                           builder: (context) => const ProgressScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 30),
+
+                  // Lista de todas as frases
+                  _buildOptionCard(
+                    context,
+                    icon: Icons.list,
+                    title: "Lista de todas as frases",
+                    subtitle: "Navegue por todas as frases e suas anotações",
+                    color: Colors.orange[400]!,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AllSentencesScreen(),
                         ),
                       );
                     },
