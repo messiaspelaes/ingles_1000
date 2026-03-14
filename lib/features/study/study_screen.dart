@@ -18,6 +18,7 @@ import '../../services/fsrs_service.dart';
 import '../../services/database_service.dart';
 import '../../core/widgets/anki_content.dart';
 import 'card_fields_section.dart';
+import 'all_sentences_screen.dart';
 
 /// Tela de estudo com cards
 class StudyScreen extends StatefulWidget {
@@ -251,23 +252,46 @@ class _StudyScreenState extends State<StudyScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             color: Colors.blue[50],
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _buildCounter(
-                  icon: Icons.fiber_new,
-                  color: Colors.blue[700]!,
-                  label: 'Novos',
-                  value: _novosRestantes,
-                  isCurrent: _currentCard?.queueType == CardQueueType.newCard,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildCounter(
+                      icon: Icons.fiber_new,
+                      color: Colors.blue[700]!,
+                      label: 'Novos',
+                      value: _novosRestantes,
+                      isCurrent: _currentCard?.queueType == CardQueueType.newCard,
+                    ),
+                    const SizedBox(width: 32),
+                    _buildCounter(
+                      icon: Icons.history,
+                      color: Colors.orange[700]!,
+                      label: 'Revisão',
+                      value: _revisoesRestantes,
+                      isCurrent: _currentCard?.queueType != CardQueueType.newCard,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 32),
-                _buildCounter(
-                  icon: Icons.history,
-                  color: Colors.orange[700]!,
-                  label: 'Revisão',
-                  value: _revisoesRestantes,
-                  isCurrent: _currentCard?.queueType != CardQueueType.newCard,
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 36,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const AllSentencesScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.list, size: 18),
+                    label: const Text(
+                      'Lista de todas as frases',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
                 ),
               ],
             ),

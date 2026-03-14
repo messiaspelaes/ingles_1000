@@ -659,6 +659,21 @@ class DatabaseService {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
+  /// Obtém todos os cards do banco em ordem estável, com paginação
+  Future<List<Card>> getAllCardsOrdered({
+    required int limit,
+    required int offset,
+  }) async {
+    final db = await database;
+    final maps = await db.query(
+      'cards',
+      orderBy: 'created_at ASC, id ASC',
+      limit: limit,
+      offset: offset,
+    );
+    return maps.map((map) => _cardFromMap(map)).toList();
+  }
+
   /// Obtém o total de cards revisados hoje
   Future<int> getReviewedTodayCount() async {
     final db = await database;
