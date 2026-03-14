@@ -17,6 +17,7 @@ import '../../models/review_log.dart';
 import '../../services/fsrs_service.dart';
 import '../../services/database_service.dart';
 import '../../core/widgets/anki_content.dart';
+import 'card_fields_section.dart';
 
 /// Tela de estudo com cards
 class StudyScreen extends StatefulWidget {
@@ -272,26 +273,65 @@ class _StudyScreenState extends State<StudyScreen> {
             ),
           ),
 
-          // Card
+          // Card + campos opcionais (associação/anotação)
           Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Material(
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  color: Colors.white,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(32),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (!_showAnswer)
-                            AnkiContent(
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Material(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                color: Colors.white,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(32),
+                  child: _showAnswer
+                      ? SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              AnkiContent(
+                                content: _currentNote?.frontField ?? '',
+                                deckId: _currentCard?.deckId ?? '',
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                textAlign: TextAlign.center,
+                                autoPlay: true,
+                              ),
+                              const SizedBox(height: 24),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: AnkiContent(
+                                  content: _currentNote?.backField ?? '',
+                                  deckId: _currentCard?.deckId ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  autoPlay: true,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              if (_currentCard != null && _currentNote != null)
+                                CardFieldsSection(
+                                  cardId: _currentCard!.id,
+                                  phrase: _currentNote!.frontField,
+                                  databaseService: _databaseService,
+                                ),
+                            ],
+                          ),
+                        )
+                      : Center(
+                          child: SingleChildScrollView(
+                            child: AnkiContent(
                               content: _currentNote?.frontField ?? '',
                               deckId: _currentCard?.deckId ?? '',
                               style: const TextStyle(
@@ -300,44 +340,9 @@ class _StudyScreenState extends State<StudyScreen> {
                               ),
                               textAlign: TextAlign.center,
                               autoPlay: true,
-                            )
-                          else
-                            Column(
-                              children: [
-                                AnkiContent(
-                                  content: _currentNote?.frontField ?? '',
-                                  deckId: _currentCard?.deckId ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                  autoPlay: true,
-                                ),
-                                const SizedBox(height: 24),
-                                Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue[50],
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: AnkiContent(
-                                    content: _currentNote?.backField ?? '',
-                                    deckId: _currentCard?.deckId ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    autoPlay: true,
-                                  ),
-                                ),
-                              ],
                             ),
-                        ],
-                      ),
-                    ),
-                  ),
+                          ),
+                        ),
                 ),
               ),
             ),

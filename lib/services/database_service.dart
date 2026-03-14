@@ -23,7 +23,7 @@ import 'dart:convert';
 /// Substitui o SupabaseService para funcionamento 100% offline
 class DatabaseService {
   static const String _databaseName = 'ingles1000.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 2;
 
   static Database? _database;
 
@@ -139,6 +139,28 @@ class DatabaseService {
       )
     ''');
 
+    // Tabela de Associações por palavra (anotações do usuário)
+    await db.execute('''
+      CREATE TABLE card_associations (
+        card_id TEXT NOT NULL,
+        word TEXT NOT NULL,
+        association_text TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (card_id, word),
+        FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+      )
+    ''');
+
+    // Tabela de Anotações por card (anotações livres do usuário)
+    await db.execute('''
+      CREATE TABLE card_notes (
+        card_id TEXT PRIMARY KEY,
+        note_text TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+      )
+    ''');
+
     // Índices para performance
     await db.execute('CREATE INDEX idx_cards_deck ON cards(deck_id)');
     await db.execute('CREATE INDEX idx_cards_due_date ON cards(due_date)');
@@ -150,12 +172,41 @@ class DatabaseService {
       'CREATE INDEX idx_review_logs_card ON review_logs(card_id)',
     );
 
+    await db.execute(
+      'CREATE INDEX idx_card_associations_card ON card_associations(card_id)',
+    );
+
     AppLogger.s(LogCategory.db, 'Tabelas criadas com sucesso!');
   }
 
   /// Atualiza o banco em versões futuras
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Implementar migrações futuras aqui
+    if (oldVersion < 2) {
+      // Novas tabelas de anotações do usuário
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS card_associations (
+          card_id TEXT NOT NULL,
+          word TEXT NOT NULL,
+          association_text TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (card_id, word),
+          FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS card_notes (
+          card_id TEXT PRIMARY KEY,
+          note_text TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (card_id) REFERENCES cards(id) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_card_associations_card ON card_associations(card_id)',
+      );
+    }
   }
 
   // ============================================================================
@@ -379,6 +430,95 @@ class DatabaseService {
       orderBy: 'reviewed_at DESC',
     );
     return maps.map((map) => _reviewLogFromMap(map)).toList();
+  }
+
+  // ============================================================================
+  // USER NOTES & ASSOCIATIONS
+  // ============================================================================
+
+  /// Retorna todas as associações (palavra -> texto) de um card
+  Future<Map<String, String>> getAssociationsByCardId(String cardId) async {
+    final db = await database;
+    final maps = await db.query(
+      'card_associations',
+      where: 'card_id = ?',
+      whereArgs: [cardId],
+    );
+
+    final result = <String, String>{};
+    for (final map in maps) {
+      final word = map['word'] as String;
+      final text = map['association_text'] as String;
+      result[word] = text;
+    }
+    return result;
+  }
+
+  /// Salva (ou remove) a associação de uma palavra de um card
+  Future<void> saveAssociation(String cardId, String word, String text) async {
+    final db = await database;
+
+    if (text.trim().isEmpty) {
+      await db.delete(
+        'card_associations',
+        where: 'card_id = ? AND word = ?',
+        whereArgs: [cardId, word],
+      );
+      return;
+    }
+
+    final now = DateTime.now().toIso8601String();
+
+    await db.insert(
+      'card_associations',
+      {
+        'card_id': cardId,
+        'word': word,
+        'association_text': text,
+        'updated_at': now,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  /// Retorna a anotação livre de um card (se existir)
+  Future<String?> getCardNote(String cardId) async {
+    final db = await database;
+    final maps = await db.query(
+      'card_notes',
+      where: 'card_id = ?',
+      whereArgs: [cardId],
+      limit: 1,
+    );
+
+    if (maps.isEmpty) return null;
+    return maps.first['note_text'] as String?;
+  }
+
+  /// Salva (ou remove) a anotação livre de um card
+  Future<void> saveCardNote(String cardId, String text) async {
+    final db = await database;
+
+    if (text.trim().isEmpty) {
+      await db.delete(
+        'card_notes',
+        where: 'card_id = ?',
+        whereArgs: [cardId],
+      );
+      return;
+    }
+
+    final now = DateTime.now().toIso8601String();
+
+    await db.insert(
+      'card_notes',
+      {
+        'card_id': cardId,
+        'note_text': text,
+        'updated_at': now,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   // ============================================================================
