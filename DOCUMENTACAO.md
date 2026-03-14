@@ -24,7 +24,7 @@ Aplicativo Flutter 100% offline para aprender as **1000 frases mais comuns em in
 |------|---------|
 | Plataforma | Android / iOS (Flutter) |
 | Armazenamento | 100% local — SQLite via `sqflite` |
-| Algoritmo | FSRS v4 (com fallback SM-2) |
+| Algoritmo | FSRS nativo em Dart (pacote `fsrs`) |
 | Fonte dos dados | Arquivo `.apkg` embutido em `assets/decks/` |
 | Autenticação | Nenhuma — sem login |
 | Conexão | Não necessária (completamente offline) |
@@ -53,8 +53,7 @@ lib/
 ├── services/
 │   ├── apkg_service.dart        # Importação de arquivos .apkg
 │   ├── database_service.dart    # CRUD SQLite local
-│   ├── fsrs_service.dart        # Cálculo do próximo intervalo FSRS
-│   └── fsrs/                    # Runtime JS do FSRS
+│   └── fsrs_service.dart        # Cálculo do próximo intervalo FSRS
 │
 ├── core/
 │   ├── widgets/
@@ -274,14 +273,14 @@ Gerencia o banco SQLite local do app (`ingles1000.db`). Singleton — uma única
 
 ### `fsrs_service.dart` — Algoritmo de Repetição Espaçada
 
-Calcula o próximo intervalo de revisão usando o algoritmo **FSRS v4**.
+Calcula o próximo intervalo de revisão usando o pacote oficial **FSRS** nativo em Dart.
 
 | Função | Descrição |
 |--------|-----------|
-| `initialize()` | Inicializa o runtime JavaScript para executar o FSRS |
+| `initialize()` | Inicializa o serviço FSRS |
 | `calculateNextState(card, rating, now)` | Retorna `FsrsResult` com difficulty, stability, intervalDays e dueDate |
 
-**Fallback:** Se o runtime JS não estiver disponível, usa cálculo simplificado baseado em SM-2:
+**Fallback:** Se o cálculo do pacote falhar, usa um cálculo simplificado baseado em SM-2:
 
 | Rating | Comportamento |
 |--------|--------------|
@@ -328,7 +327,7 @@ O banco **persiste entre sessões** — o progresso não é perdido ao fechar o 
 
 ## Algoritmo FSRS
 
-O FSRS (Free Spaced Repetition Scheduler) agenda cada card individualmente com base em três parâmetros:
+O FSRS (Free Spaced Repetition Scheduler) agenda cada card individualmente com base em três parâmetros fundamentais. Este app utiliza o pacote oficial `fsrs` nativo em Dart para estes cálculos.
 
 | Parâmetro | Significado |
 |-----------|-------------|
