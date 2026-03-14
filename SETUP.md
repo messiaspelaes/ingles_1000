@@ -55,19 +55,9 @@ lib/
    static const String supabaseAnonKey = 'sua-anon-key-aqui';
    ```
 
-### 2. Adicionar FSRS.js
+### 2. Instalar Dependências
 
-1. Baixe `fsrs.js` de: https://github.com/open-spaced-repetition/fsrs.js
-2. Crie a pasta `assets/js/` se não existir
-3. Coloque `fsrs.js` em `assets/js/fsrs.js`
-4. Atualize `pubspec.yaml`:
-   ```yaml
-   flutter:
-     assets:
-       - assets/js/fsrs.js
-   ```
-
-### 3. Instalar Dependências
+Execute o comando para instalar o pacote `fsrs` nativo e outras dependências:
 
 ```bash
 flutter pub get
@@ -154,8 +144,8 @@ O schema do Supabase segue a estrutura do Anki:
 
 ### FSRS
 
-O algoritmo FSRS está implementado via `flutter_js` executando `fsrs.js`. 
-O serviço inclui um fallback simplificado caso o JS falhe.
+O algoritmo FSRS está implementado via o pacote nativo `fsrs` do Dart. 
+O serviço inclui um fallback simplificado caso ocorra algum erro inesperado no cálculo.
 
 ## 🐛 Troubleshooting
 
@@ -164,8 +154,7 @@ O serviço inclui um fallback simplificado caso o JS falhe.
 - Confira os logs no console
 
 ### FSRS não funciona
-- Verifique se `fsrs.js` está em `assets/js/`
-- Confira se está no `pubspec.yaml`
+- Verifique se as dependências foram instaladas corretamente (`flutter pub get`)
 
 ### Supabase não conecta
 - Verifique URL e Anon Key

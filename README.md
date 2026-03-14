@@ -39,18 +39,7 @@ lib/
    static const String supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY';
    ```
 
-### 2. Adicionar FSRS.js
-
-1. Baixe `fsrs.js` de: https://github.com/open-spaced-repetition/fsrs.js
-2. Coloque em `assets/js/fsrs.js`
-3. Adicione ao `pubspec.yaml`:
-   ```yaml
-   flutter:
-     assets:
-       - assets/js/fsrs.js
-   ```
-
-### 3. Instalar dependências
+### 2. Instalar dependências
 
 ```bash
 flutter pub get
@@ -59,7 +48,7 @@ flutter pub get
 ## 📦 Dependências Principais
 
 - `supabase_flutter`: Backend e autenticação
-- `flutter_js`: Executar FSRS.js
+- `fsrs`: Algoritmo FSRS nativo em Dart
 - `archive`: Descompactar arquivos .apkg
 - `sqflite`: Ler banco SQLite do Anki
 - `file_picker`: Selecionar arquivos .apkg

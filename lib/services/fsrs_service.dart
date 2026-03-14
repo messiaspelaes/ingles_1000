@@ -7,52 +7,33 @@
  * version.
  * 
  * Adaptado de AnkiDroid (GPL v3) - https://github.com/ankidroid/Anki-Android
- * Utiliza FSRS (Free Spaced Repetition Scheduler) - https://github.com/open-spaced-repetition/fsrs4anki
+ * Utiliza o pacote oficial Dart FSRS - https://pub.dev/packages/fsrs
  */
 
-import 'fsrs/fsrs_executor.dart';
-import '../models/card.dart';
+import 'package:fsrs/fsrs.dart' as fsrs;
+import '../models/card.dart' as models;
 import '../utils/app_logger.dart';
 
-/// Serviço para calcular intervalos usando FSRS
-/// Integra fsrs.js via flutter_js
+/// Serviço para calcular intervalos usando o pacote nativo FSRS em Dart.
 class FsrsService {
   static final FsrsService _instance = FsrsService._internal();
   factory FsrsService() => _instance;
   FsrsService._internal();
 
-  FsrsExecutor? _executor;
+  final fsrs.Scheduler _scheduler = fsrs.Scheduler();
   bool _initialized = false;
 
-  /// Inicializa o runtime JavaScript e carrega fsrs.js
+  /// Inicializa o serviço (agora apenas marca como pronto, já que o scheduler é nativo)
   Future<void> initialize() async {
     if (_initialized) return;
-
-    try {
-      // Tenta criar o executor (Native ou Web)
-      try {
-        _executor = getFsrsExecutor();
-        await _executor!.initialize();
-      } catch (e) {
-        // Se o runtime JS não estiver disponível, usa apenas fallback
-        AppLogger.w(LogCategory.fsrs, 'Runtime JavaScript não disponível, usando cálculo fallback: $e');
-        _executor = null;
-      }
-      
-      _initialized = true;
-    } catch (e) {
-      // Em caso de erro, marca como inicializado mas sem JS runtime
-      _initialized = true;
-      _executor = null;
-      AppLogger.e(LogCategory.fsrs, 'Erro ao inicializar FSRS, usando cálculo fallback', e);
-    }
+    _initialized = true;
+    AppLogger.i(LogCategory.fsrs, 'FSRS nativo inicializado');
   }
 
   /// Calcula o próximo estado do card após uma revisão
-  /// Baseado em AnkiDroid Scheduler.answerCard()
   Future<FsrsResult> calculateNextState({
-    required Card card,
-    required CardRating rating,
+    required models.Card card,
+    required models.CardRating rating,
     required DateTime now,
   }) async {
     if (!_initialized) {
@@ -60,63 +41,102 @@ class FsrsService {
     }
 
     try {
-      // Prepara os parâmetros FSRS
-      final params = {
-        'difficulty': card.fsrsDifficulty,
-        'stability': card.fsrsStability,
-        'retrievability': card.fsrsRetrievability,
-        'lastReview': card.lastReviewAt?.millisecondsSinceEpoch ?? now.millisecondsSinceEpoch,
-        'now': now.millisecondsSinceEpoch,
-        'rating': rating.value,
-      };
-
-      if (_executor == null) {
-        // Se não houver runtime JS, usa fallback
-        return _calculateFallback(card, rating, now);
+      // 1. Mapeia o estado do card do app para o estado do pacote fsrs
+      fsrs.State fsrsState;
+      switch (card.queueType) {
+        case models.CardQueueType.newCard:
+          fsrsState =
+              fsrs
+                  .State
+                  .learning; // FSRS não tem estado 'newCard', usa learning
+          break;
+        case models.CardQueueType.learning:
+          fsrsState = fsrs.State.learning;
+          break;
+        case models.CardQueueType.review:
+          fsrsState = fsrs.State.review;
+          break;
+        case models.CardQueueType.relearning:
+          fsrsState = fsrs.State.relearning;
+          break;
       }
 
-      final resultMap = await _executor!.evaluate(params);
+      // 2. Cria o objeto Card esperado pelo pacote fsrs
+      // Nota: o pacote usa UTC para datas e cardId é obrigatório (usamos o ankiCardId ou hash do ID)
+      final fsrsCard = fsrs.Card(
+        cardId: card.ankiCardId ?? card.id.hashCode,
+        due: card.dueDate.toUtc(),
+        stability: card.fsrsStability > 0 ? card.fsrsStability : null,
+        difficulty: card.fsrsDifficulty > 0 ? card.fsrsDifficulty : null,
+        state: fsrsState,
+        lastReview: card.lastReviewAt?.toUtc(),
+      );
 
-      if (resultMap == null) {
-        return _calculateFallback(card, rating, now);
+      // 3. Mapeia o rating do app para o rating do pacote fsrs
+      fsrs.Rating fsrsRating;
+      switch (rating) {
+        case models.CardRating.again:
+          fsrsRating = fsrs.Rating.again;
+          break;
+        case models.CardRating.hard:
+          fsrsRating = fsrs.Rating.hard;
+          break;
+        case models.CardRating.good:
+          fsrsRating = fsrs.Rating.good;
+          break;
+        case models.CardRating.easy:
+          fsrsRating = fsrs.Rating.easy;
+          break;
       }
+
+      // 4. Executa o cálculo
+      final reviewResult = _scheduler.reviewCard(
+        fsrsCard,
+        fsrsRating,
+        reviewDateTime: now.toUtc(),
+      );
+      final nextCard = reviewResult.card;
 
       return FsrsResult(
-        difficulty: (resultMap['difficulty'] as num).toDouble(),
-        stability: (resultMap['stability'] as num).toDouble(),
-        intervalDays: (resultMap['interval'] as num).toInt(),
-        dueDate: DateTime.fromMillisecondsSinceEpoch(resultMap['dueDate'] as int),
+        difficulty: nextCard.difficulty ?? card.fsrsDifficulty,
+        stability: nextCard.stability ?? card.fsrsStability,
+        intervalDays: nextCard.due.difference(now).inDays.clamp(1, 365),
+        dueDate: nextCard.due.toLocal(),
       );
     } catch (e, stack) {
-      AppLogger.e(LogCategory.fsrs, 'Erro no cálculo FSRS', e, stack);
-      // Fallback para cálculo simples se FSRS falhar
+      AppLogger.e(LogCategory.fsrs, 'Erro no cálculo FSRS nativo', e, stack);
+      // Fallback para cálculo simples se algo der errado
       return _calculateFallback(card, rating, now);
     }
   }
 
-  /// Cálculo fallback simplificado (SM-2 like)
-  FsrsResult _calculateFallback(Card card, CardRating rating, DateTime now) {
+  /// Cálculo fallback simplificado (SM-2 like) caso o pacote falhe
+  FsrsResult _calculateFallback(
+    models.Card card,
+    models.CardRating rating,
+    DateTime now,
+  ) {
     double newStability = card.fsrsStability;
     double newDifficulty = card.fsrsDifficulty;
     int newInterval = 1;
 
     switch (rating) {
-      case CardRating.again:
+      case models.CardRating.again:
         newStability = 0.0;
         newDifficulty = (card.fsrsDifficulty + 0.2).clamp(0.0, 1.0);
         newInterval = 1;
         break;
-      case CardRating.hard:
+      case models.CardRating.hard:
         newStability = card.fsrsStability * 1.2;
         newDifficulty = (card.fsrsDifficulty + 0.15).clamp(0.0, 1.0);
         newInterval = (newStability).round().clamp(1, 365);
         break;
-      case CardRating.good:
+      case models.CardRating.good:
         newStability = card.fsrsStability * 2.5;
         newDifficulty = card.fsrsDifficulty;
         newInterval = (newStability).round().clamp(1, 365);
         break;
-      case CardRating.easy:
+      case models.CardRating.easy:
         newStability = card.fsrsStability * 4.0;
         newDifficulty = (card.fsrsDifficulty - 0.15).clamp(0.0, 1.0);
         newInterval = (newStability).round().clamp(1, 365);
@@ -131,9 +151,8 @@ class FsrsService {
     );
   }
 
-  /// Limpa recursos
+  /// Limpa recursos (vazio para o scheduler nativo)
   void dispose() {
-    _executor?.dispose();
     _initialized = false;
   }
 }
