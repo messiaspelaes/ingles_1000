@@ -45,7 +45,10 @@ class DatabaseService {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: (db) {
-        AppLogger.i(LogCategory.db, 'Banco de dados aberto no caminho: $dbPath');
+        AppLogger.i(
+          LogCategory.db,
+          'Banco de dados aberto no caminho: $dbPath',
+        );
       },
     );
   }
@@ -53,7 +56,7 @@ class DatabaseService {
   /// Cria as tabelas na primeira execução
   Future<void> _onCreate(Database db, int version) async {
     AppLogger.i(LogCategory.db, 'Criando tabelas do banco de dados...');
-    
+
     // Tabela de Decks
     await db.execute('''
       CREATE TABLE decks (
@@ -370,6 +373,44 @@ class DatabaseService {
     return maps.map((map) => _cardFromMap(map)).toList();
   }
 
+  /// Obtém cards que venceriam amanhã para revisão antecipada
+  Future<List<Card>> getTomorrowReviewCards({
+    String? deckId,
+    int? limit,
+  }) async {
+    final db = await database;
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final tomorrowEnd =
+        DateTime(
+          tomorrow.year,
+          tomorrow.month,
+          tomorrow.day,
+          23,
+          59,
+          59,
+        ).toIso8601String();
+
+    // Pega cards que venceriam até o final de amanhã (não são novos)
+    String whereClause = 'due_date <= ? AND queue_type != ?';
+    List<dynamic> whereArgs = [tomorrowEnd, 'NEW'];
+
+    if (deckId != null) {
+      whereClause += ' AND deck_id = ?';
+      whereArgs.add(deckId);
+    }
+
+    final maps = await db.query(
+      'cards',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'due_date ASC', // Ordena por data de vencimento
+      limit: limit,
+    );
+
+    return maps.map((map) => _cardFromMap(map)).toList();
+  }
+
   /// Obtém um card por ID
   Future<Card?> getCardById(String id) async {
     final db = await database;
@@ -469,16 +510,12 @@ class DatabaseService {
 
     final now = DateTime.now().toIso8601String();
 
-    await db.insert(
-      'card_associations',
-      {
-        'card_id': cardId,
-        'word': word,
-        'association_text': text,
-        'updated_at': now,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('card_associations', {
+      'card_id': cardId,
+      'word': word,
+      'association_text': text,
+      'updated_at': now,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   /// Retorna a anotação livre de um card (se existir)
@@ -500,25 +537,17 @@ class DatabaseService {
     final db = await database;
 
     if (text.trim().isEmpty) {
-      await db.delete(
-        'card_notes',
-        where: 'card_id = ?',
-        whereArgs: [cardId],
-      );
+      await db.delete('card_notes', where: 'card_id = ?', whereArgs: [cardId]);
       return;
     }
 
     final now = DateTime.now().toIso8601String();
 
-    await db.insert(
-      'card_notes',
-      {
-        'card_id': cardId,
-        'note_text': text,
-        'updated_at': now,
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await db.insert('card_notes', {
+      'card_id': cardId,
+      'note_text': text,
+      'updated_at': now,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   // ============================================================================

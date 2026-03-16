@@ -68,7 +68,8 @@ class _StudyScreenState extends State<StudyScreen> {
 
       // Carregar filas da sessão
       final novos = await _databaseService.getNewCards(limit: novosPossiveis);
-      final revisoes = await _databaseService.getReviewCards(); // Todos os devidos
+      final revisoes =
+          await _databaseService.getReviewCards(); // Todos os devidos
 
       _newQueue.clear();
       _reviewQueue.clear();
@@ -83,8 +84,43 @@ class _StudyScreenState extends State<StudyScreen> {
       await _showNextCard();
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao iniciar sessão: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Carrega revisões antecipadas (cards que venceriam amanhã)
+  Future<void> _loadTomorrowReviews() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final tomorrowReviews = await _databaseService.getTomorrowReviewCards();
+
+      if (tomorrowReviews.isNotEmpty) {
+        _reviewQueue.clear();
+        _reviewQueue.addAll(tomorrowReviews);
+
+        setState(() {
+          _revisoesRestantes = _reviewQueue.length;
+        });
+
+        await _showNextCard();
+      } else {
+        // Não há revisões para antecipar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Não há revisões para antecipar!')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao iniciar sessão: $e')),
+          SnackBar(content: Text('Erro ao carregar revisões antecipadas: $e')),
         );
       }
     } finally {
@@ -131,9 +167,10 @@ class _StudyScreenState extends State<StudyScreen> {
 
     try {
       final now = DateTime.now();
-      final timeTakenMs = _cardShownAt != null
-          ? now.difference(_cardShownAt!).inMilliseconds
-          : 0;
+      final timeTakenMs =
+          _cardShownAt != null
+              ? now.difference(_cardShownAt!).inMilliseconds
+              : 0;
 
       // Guardar estado FSRS anterior para o ReviewLog
       final difficultyBefore = _currentCard!.fsrsDifficulty;
@@ -186,9 +223,17 @@ class _StudyScreenState extends State<StudyScreen> {
 
       // 5. Decrementar contador correto
       if (wasNew) {
-        setState(() => _novosRestantes = (_novosRestantes - 1).clamp(0, _limitNovos));
+        setState(
+          () => _novosRestantes = (_novosRestantes - 1).clamp(0, _limitNovos),
+        );
       } else {
-        setState(() => _revisoesRestantes = (_revisoesRestantes - 1).clamp(0, _revisoesRestantes));
+        setState(
+          () =>
+              _revisoesRestantes = (_revisoesRestantes - 1).clamp(
+                0,
+                _revisoesRestantes,
+              ),
+        );
       }
 
       // 6. Próximo card
@@ -207,9 +252,7 @@ class _StudyScreenState extends State<StudyScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading && _currentCard == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_currentCard == null && _currentNote == null) {
@@ -219,7 +262,11 @@ class _StudyScreenState extends State<StudyScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.check_circle_outline, size: 80, color: Colors.green[300]),
+              Icon(
+                Icons.check_circle_outline,
+                size: 80,
+                color: Colors.green[300],
+              ),
               const SizedBox(height: 16),
               const Text(
                 'Parabéns! 🎉',
@@ -233,6 +280,15 @@ class _StudyScreenState extends State<StudyScreen> {
               ),
               const SizedBox(height: 32),
               ElevatedButton(
+                onPressed: _loadTomorrowReviews,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange[400],
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Antecipar revisões de amanhã'),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('Voltar ao Menu'),
               ),
@@ -243,9 +299,7 @@ class _StudyScreenState extends State<StudyScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Estudar'),
-      ),
+      appBar: AppBar(title: const Text('Estudar')),
       body: Column(
         children: [
           // Barra de progresso da sessão
@@ -263,7 +317,8 @@ class _StudyScreenState extends State<StudyScreen> {
                       color: Colors.blue[700]!,
                       label: 'Novos',
                       value: _novosRestantes,
-                      isCurrent: _currentCard?.queueType == CardQueueType.newCard,
+                      isCurrent:
+                          _currentCard?.queueType == CardQueueType.newCard,
                     ),
                     const SizedBox(width: 32),
                     _buildCounter(
@@ -271,7 +326,8 @@ class _StudyScreenState extends State<StudyScreen> {
                       color: Colors.orange[700]!,
                       label: 'Revisão',
                       value: _revisoesRestantes,
-                      isCurrent: _currentCard?.queueType != CardQueueType.newCard,
+                      isCurrent:
+                          _currentCard?.queueType != CardQueueType.newCard,
                     ),
                   ],
                 ),
@@ -310,63 +366,65 @@ class _StudyScreenState extends State<StudyScreen> {
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(32),
-                  child: _showAnswer
-                      ? SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              AnkiContent(
-                                content: _currentNote?.frontField ?? '',
-                                deckId: _currentCard?.deckId ?? '',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                textAlign: TextAlign.center,
-                                autoPlay: true,
-                              ),
-                              const SizedBox(height: 24),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: AnkiContent(
-                                  content: _currentNote?.backField ?? '',
+                  child:
+                      _showAnswer
+                          ? SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                AnkiContent(
+                                  content: _currentNote?.frontField ?? '',
                                   deckId: _currentCard?.deckId ?? '',
                                   style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                   textAlign: TextAlign.center,
                                   autoPlay: true,
                                 ),
-                              ),
-                              const SizedBox(height: 16),
-                              if (_currentCard != null && _currentNote != null)
-                                CardFieldsSection(
-                                  cardId: _currentCard!.id,
-                                  phrase: _currentNote!.frontField,
-                                  databaseService: _databaseService,
+                                const SizedBox(height: 24),
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: AnkiContent(
+                                    content: _currentNote?.backField ?? '',
+                                    deckId: _currentCard?.deckId ?? '',
+                                    style: const TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    autoPlay: true,
+                                  ),
                                 ),
-                            ],
-                          ),
-                        )
-                      : Center(
-                          child: SingleChildScrollView(
-                            child: AnkiContent(
-                              content: _currentNote?.frontField ?? '',
-                              deckId: _currentCard?.deckId ?? '',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
+                                const SizedBox(height: 16),
+                                if (_currentCard != null &&
+                                    _currentNote != null)
+                                  CardFieldsSection(
+                                    cardId: _currentCard!.id,
+                                    phrase: _currentNote!.frontField,
+                                    databaseService: _databaseService,
+                                  ),
+                              ],
+                            ),
+                          )
+                          : Center(
+                            child: SingleChildScrollView(
+                              child: AnkiContent(
+                                content: _currentNote?.frontField ?? '',
+                                deckId: _currentCard?.deckId ?? '',
+                                style: const TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                                autoPlay: true,
                               ),
-                              textAlign: TextAlign.center,
-                              autoPlay: true,
                             ),
                           ),
-                        ),
                 ),
               ),
             ),
@@ -390,8 +448,16 @@ class _StudyScreenState extends State<StudyScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildAnswerButton('Novamente', CardRating.again, Colors.red),
-                    _buildAnswerButton('Difícil', CardRating.hard, Colors.orange),
+                    _buildAnswerButton(
+                      'Novamente',
+                      CardRating.again,
+                      Colors.red,
+                    ),
+                    _buildAnswerButton(
+                      'Difícil',
+                      CardRating.hard,
+                      Colors.orange,
+                    ),
                     _buildAnswerButton('Bom', CardRating.good, Colors.blue),
                     _buildAnswerButton('Fácil', CardRating.easy, Colors.green),
                   ],
