@@ -222,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
                     icon: Icons.list,
                     title: "Lista de todas as frases",
-                    subtitle: "Navegue por todas as frases e suas anotações",
+                    subtitle: "Navegue por todas as frases",
                     color: Colors.orange[400]!,
                     onTap: () {
                       Navigator.push(
