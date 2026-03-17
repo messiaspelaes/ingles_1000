@@ -362,6 +362,7 @@ class _StudyScreenState extends State<StudyScreen> {
                 showBack: _showAnswer,
                 front: _buildCardFront(),
                 back: _buildCardBack(),
+                backColor: const Color(0xFFF7FAFF),
               ),
             ),
           ),

@@ -7,25 +7,40 @@ class FlipStudyCard extends StatelessWidget {
     required this.showBack,
     required this.front,
     required this.back,
+    this.backColor,
     this.elevation = 8,
     this.borderRadius = 16,
     this.padding = const EdgeInsets.all(32),
+    this.minHeight = 320,
+    this.maxHeight = 520,
+    this.heightFactor = 0.42,
   });
 
   final bool showBack;
   final Widget front;
   final Widget back;
+  final Color? backColor;
   final double elevation;
   final double borderRadius;
   final EdgeInsets padding;
+  final double minHeight;
+  final double maxHeight;
+  final double heightFactor;
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final targetHeight = (screenHeight * heightFactor)
+        .clamp(minHeight, maxHeight);
+
+    // Suaviza ambos os sentidos do flip
+    final animationCurve = Curves.easeInOutCubic;
+
     return Center(
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 750),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
+        duration: const Duration(milliseconds: 900),
+        switchInCurve: animationCurve,
+        switchOutCurve: animationCurve,
         layoutBuilder: (currentChild, previousChildren) {
           return Stack(
             alignment: Alignment.center,
@@ -63,9 +78,10 @@ class FlipStudyCard extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(borderRadius),
           ),
-          color: Colors.white,
+          color: showBack ? (backColor ?? Colors.white) : Colors.white,
           child: Container(
             width: double.infinity,
+            height: targetHeight,
             padding: padding,
             child: showBack ? back : front,
           ),
