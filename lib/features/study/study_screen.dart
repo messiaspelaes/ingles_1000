@@ -359,6 +359,7 @@ class _StudyScreenState extends State<StudyScreen> {
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: FlipStudyCard(
+                cardId: _currentCard!.id,
                 showBack: _showAnswer,
                 front: _buildCardFront(),
                 back: _buildCardBack(),
