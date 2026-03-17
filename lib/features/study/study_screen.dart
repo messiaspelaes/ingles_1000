@@ -356,7 +356,7 @@ class _StudyScreenState extends State<StudyScreen> {
 
           // Card + campos opcionais (associação/anotação)
           Expanded(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: FlipStudyCard(
                 showBack: _showAnswer,
@@ -467,54 +467,50 @@ class _StudyScreenState extends State<StudyScreen> {
 
   Widget _buildCardFront() {
     return Center(
-      child: SingleChildScrollView(
-        child: AnkiContent(
-          content: _currentNote?.frontField ?? '',
-          deckId: _currentCard?.deckId ?? '',
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-          autoPlay: true,
-        ),
+      child: AnkiContent(
+        content: _currentNote?.frontField ?? '',
+        deckId: _currentCard?.deckId ?? '',
+        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        textAlign: TextAlign.center,
+        autoPlay: true,
       ),
     );
   }
 
   Widget _buildCardBack() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AnkiContent(
-            content: _currentNote?.frontField ?? '',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AnkiContent(
+          content: _currentNote?.frontField ?? '',
+          deckId: _currentCard?.deckId ?? '',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          textAlign: TextAlign.center,
+          autoPlay: true,
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.blue[50],
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: AnkiContent(
+            content: _currentNote?.backField ?? '',
             deckId: _currentCard?.deckId ?? '',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
             autoPlay: true,
           ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: AnkiContent(
-              content: _currentNote?.backField ?? '',
-              deckId: _currentCard?.deckId ?? '',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-              autoPlay: true,
-            ),
+        ),
+        const SizedBox(height: 16),
+        if (_currentCard != null && _currentNote != null)
+          CardFieldsSection(
+            cardId: _currentCard!.id,
+            phrase: _currentNote!.frontField,
+            databaseService: _databaseService,
           ),
-          const SizedBox(height: 16),
-          if (_currentCard != null && _currentNote != null)
-            CardFieldsSection(
-              cardId: _currentCard!.id,
-              phrase: _currentNote!.frontField,
-              databaseService: _databaseService,
-            ),
-        ],
-      ),
+      ],
     );
   }
 }

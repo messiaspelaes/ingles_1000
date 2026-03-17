@@ -81,7 +81,7 @@ class FlipStudyCard extends StatelessWidget {
           color: showBack ? (backColor ?? Colors.white) : Colors.white,
           child: Container(
             width: double.infinity,
-            height: targetHeight,
+            constraints: BoxConstraints(minHeight: targetHeight),
             padding: padding,
             child: showBack ? back : front,
           ),
